@@ -1,7 +1,7 @@
 TOOLCHAIN=$(shell realpath toolchain/root)
 CC=$(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
 LD=$(CC)
-CFLAGS ?= -Wall -Werror -pedantic -O1
+CFLAGS ?= -Wall -Werror -pedantic -O2
 LDFLAGS ?=
 SRC=$(shell git ls-files)
 

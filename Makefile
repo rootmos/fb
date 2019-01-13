@@ -1,0 +1,32 @@
+TOOLCHAIN=$(shell realpath toolchain/root)
+CC=$(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
+LD=$(CC)
+CFLAGS ?= -Wall -Werror -pedantic
+LDFLAGS ?=
+SRC=$(shell git ls-files)
+
+FB=/dev/fb0
+DEPLOY_HOST=pi@192.168.1.167
+DEPLOY_TARGET=$(DEPLOY_HOST):demo
+DEPLOY_LOCAL_EXECUTABLE=./demo
+
+deploy: demo
+	scp $< $(DEPLOY_TARGET)
+	ssh $(DEPLOY_HOST) /bin/sh -c "$(DEPLOY_LOCAL_EXECUTABLE) > $(FB)"
+
+run: demo
+	./$< > /dev/fb0
+
+demo: demo.o util.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+toolchain:
+	$(MAKE) -C $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $<
+
+clean:
+	rm -rf *.o demo
+
+.PHONY: run clean toolchain deploy

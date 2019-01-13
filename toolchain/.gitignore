@@ -1,0 +1,6 @@
+*.tar.gz
+root
+linux
+gcc
+glibc
+binutils

@@ -1,7 +1,7 @@
 TOOLCHAIN=$(shell realpath toolchain/root)
 CC=$(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
 LD=$(CC)
-CFLAGS ?= -Wall -Werror -pedantic
+CFLAGS ?= -Wall -Werror -pedantic -O1
 LDFLAGS ?=
 SRC=$(shell git ls-files)
 
@@ -12,7 +12,7 @@ DEPLOY_LOCAL_EXECUTABLE=./demo
 
 deploy: demo
 	scp $< $(DEPLOY_TARGET)
-	ssh $(DEPLOY_HOST) /bin/sh -c "$(DEPLOY_LOCAL_EXECUTABLE) > $(FB)"
+	ssh $(DEPLOY_HOST) $(DEPLOY_LOCAL_EXECUTABLE) $(FB)
 
 run: demo
 	./$< > /dev/fb0

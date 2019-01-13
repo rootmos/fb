@@ -15,7 +15,7 @@
                 getpid(), \
                 __extension__ __FUNCTION__,  __extension__ __FILE__, __extension__ __LINE__, \
                 strerror(errno), ##__VA_ARGS__); \
-        exit(3); \
+        _exit(3); \
     } \
 } while(0)
 

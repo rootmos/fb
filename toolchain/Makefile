@@ -1,3 +1,5 @@
+# Following: https://solarianprogrammer.com/2018/05/06/building-gcc-cross-compiler-raspberry-pi/
+
 MIRROR=https://ftpmirror.gnu.org
 BINUTILS_TARBALL=binutils-2.31.1.tar.gz
 BINUTILS_URL=$(MIRROR)/gnu/binutils/$(BINUTILS_TARBALL)

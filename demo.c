@@ -21,6 +21,7 @@ uint_fast8_t cur_page = 0;
 
 struct context {
     snd_seq_t* seq;
+    int seq_input_port;
 };
 
 struct context ctx;
@@ -49,18 +50,40 @@ static void draw_rect(const size_t x, const size_t y,
     }
 }
 
-static void initialize_alsa(void)
+static void midi_initialize(const int src_client, const int src_port)
 {
     int r = snd_seq_open(&ctx.seq, "default", SND_SEQ_OPEN_INPUT, 0);
     if(r != 0) { failwith("unable to open ALSA sequencer"); }
 
-    int client_id = snd_seq_client_id(ctx.seq);
-    info("client_id=%d", client_id);
+    r = snd_seq_set_client_name(ctx.seq, "demo");
+    if(r != 0) { failwith("unable to set client name"); }
+
+    r = snd_seq_create_simple_port(
+        ctx.seq, "input port",
+        SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
+        SND_SEQ_PORT_TYPE_MIDI_GENERIC);
+    if (r < 0) { failwith("unable to create input port"); }
+    ctx.seq_input_port = r;
+
+    r = snd_seq_connect_from(ctx.seq, ctx.seq_input_port, src_client, src_port);
+    if (r < 0) { failwith("unable to connect to source port"); }
+
+    info("%d:%d -> %d:%d",
+         src_client, src_port,
+         snd_seq_client_id(ctx.seq), ctx.seq_input_port);
+}
+
+void midi_next(void)
+{
+    snd_seq_event_t* ev;
+    int r = snd_seq_event_input(ctx.seq, &ev);
+    if(r < 0) { failwith("unable to retrieve input command"); }
 }
 
 int main(int argc, char* argv[])
 {
-    initialize_alsa();
+    midi_initialize(20, 0);
+    midi_next();
 
     assert(argc == 2);
     const char* const fbfn = argv[1];

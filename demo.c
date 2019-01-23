@@ -22,6 +22,8 @@ uint_fast8_t cur_page = 0;
 struct context {
     snd_seq_t* seq;
     int seq_input_port;
+    size_t sync;
+    size_t frame;
 };
 
 struct context ctx;
@@ -52,6 +54,8 @@ static void draw_rect(const size_t x, const size_t y,
 
 static void midi_initialize(const int src_client, const int src_port)
 {
+    memset(&ctx, 0, sizeof(ctx));
+
     int r = snd_seq_open(&ctx.seq, "default", SND_SEQ_OPEN_INPUT, 0);
     if(r != 0) { failwith("unable to open ALSA sequencer"); }
 
@@ -73,17 +77,54 @@ static void midi_initialize(const int src_client, const int src_port)
          snd_seq_client_id(ctx.seq), ctx.seq_input_port);
 }
 
+void render(void)
+{
+    clear(cur_page);
+    draw_rect(0   + 5*ctx.frame, 0  , 300, 300, 0xff0000);
+    draw_rect(300 + 5*ctx.frame, 300, 300, 300, 0x00ff00);
+    draw_rect(600 + 5*ctx.frame, 600, 300, 300, 0x0000ff);
+
+    vi.yoffset = cur_page * vi.yres;
+    vi.activate = FB_ACTIVATE_VBL;
+    int r = ioctl(fbfd, FBIOPAN_DISPLAY, &vi);
+    CHECK(r, "ioctl(FBIOPAN_DISPLAY)");
+    r = ioctl(fbfd, FBIO_WAITFORVSYNC, NULL);
+    CHECK(r, "ioctl(FBIO_WAITFORVSYNC)");
+
+    cur_page = (cur_page + 1) % 2;
+
+    ctx.frame += 1;
+}
+
 void midi_next(void)
 {
     snd_seq_event_t* ev;
     int r = snd_seq_event_input(ctx.seq, &ev);
-    if(r < 0) { failwith("unable to retrieve input command"); }
+    if(r < 0) {
+        failwith("unable to retrieve input command: %s", snd_strerror(r));
+    }
+
+    switch(ev->type) {
+    case SND_SEQ_EVENT_CLOCK:
+        if(ctx.sync % 24 == 0) {
+            render();
+        }
+        ctx.sync += 1;
+        break;
+
+    case SND_SEQ_EVENT_NOTEON:
+    default: break;
+    }
+
+    r = snd_seq_free_event(ev);
+    if(r < 0) {
+        failwith("unable to free event: %s", snd_strerror(r));
+    }
 }
 
 int main(int argc, char* argv[])
 {
     midi_initialize(20, 0);
-    midi_next();
 
     assert(argc == 2);
     const char* const fbfn = argv[1];
@@ -112,21 +153,10 @@ int main(int argc, char* argv[])
     page_size = fi.line_length * vi.yres;
     memset(fb, 0, fi.smem_len);
 
-    for(size_t i = 0; i < 300; i += 100) {
-        clear(cur_page);
-        draw_rect(0   + i, 0  , 300, 300, 0xff0000);
-        draw_rect(300 + i, 300, 300, 300, 0x00ff00);
-        draw_rect(600 + i, 600, 300, 300, 0x0000ff);
-
-        vi.yoffset = cur_page * vi.yres;
-        vi.activate = FB_ACTIVATE_VBL;
-        r = ioctl(fbfd, FBIOPAN_DISPLAY, &vi);
-        CHECK(r, "ioctl(FBIOPAN_DISPLAY)");
-        r = ioctl(fbfd, FBIO_WAITFORVSYNC, NULL);
-        CHECK(r, "ioctl(FBIO_WAITFORVSYNC)");
-
-        cur_page = (cur_page + 1) % 2;
+    while(1) {
+        midi_next();
     }
+
 
     r = ioctl(fbfd, FBIOPUT_VSCREENINFO, &orig_vi);
     CHECK(r, "ioctl(FBIOPUT_VSCREENINFO)");

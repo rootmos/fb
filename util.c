@@ -9,9 +9,9 @@
 #include <time.h>
 #include <unistd.h>
 
-static const char* current_time_str(void)
+const char* now_iso8601(void)
 {
-    static char buf[22];
+    static char buf[17];
     const time_t t = time(NULL);
     size_t r = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%SZ", gmtime(&t));
     assert(r > 0);
@@ -23,7 +23,7 @@ static void log_prefix(const char* const caller,
                        const unsigned int line)
 {
     fprintf(stderr, "%s:%d:%s:%s:%u ",
-            current_time_str(), getpid(), caller, file, line);
+            now_iso8601(), getpid(), caller, file, line);
 }
 
 void __info(const char* const caller,

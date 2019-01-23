@@ -22,6 +22,8 @@
     __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
                __extension__ __LINE__, 0, format "\n", ##__VA_ARGS__)
 
+#define not_implemented() failwith("not implemented")
+
 void __failwith(const char* const caller,
                 const char* const file,
                 const unsigned int line,
@@ -36,3 +38,6 @@ void __info(const char* const caller,
     __attribute__ ((format (printf, 4, 5)));
 
 const char* getenv_mandatory(const char* const env);
+
+// returns current time formated as: 20190123T182628Z
+const char* now_iso8601(void);

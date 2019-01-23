@@ -26,7 +26,7 @@ toolchain:
 	$(MAKE) -C $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c $<
 
 clean:
 	rm -rf *.o demo

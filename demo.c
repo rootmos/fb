@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <alsa/asoundlib.h>
 
@@ -19,11 +20,19 @@ char* fb = NULL;
 size_t page_size = 0;
 uint_fast8_t cur_page = 0;
 
+struct mark {
+    struct timespec t;
+    size_t count;
+};
+
 struct context {
     snd_seq_t* seq;
     int seq_input_port;
     size_t sync;
     size_t frame;
+
+    struct mark frames;
+    struct mark syncs;
 };
 
 struct context ctx;
@@ -35,7 +44,7 @@ static void clear(uint_fast8_t page)
 
 typedef uint_fast32_t color_t;
 
-static void put_pixel(const size_t x, const size_t y, const color_t c)
+static inline void put_pixel(const size_t x, const size_t y, const color_t c)
 {
     const size_t off = (x * 3) + y * fi.line_length + cur_page * page_size;
     memcpy(fb + off, &c, 3);
@@ -77,7 +86,29 @@ static void midi_initialize(const int src_client, const int src_port)
          snd_seq_client_id(ctx.seq), ctx.seq_input_port);
 }
 
-void render(void)
+static void mark_set(struct mark* const m)
+{
+    int r = clock_gettime(CLOCK_MONOTONIC_RAW, &m->t);
+    CHECK(r, "clock_gettime(CLOCK_MONOTONIC_RAW, ..)");
+
+    m->count = 0;
+}
+
+static void mark_tick(struct mark* const m, const char* const what)
+{
+    m->count += 1;
+
+    if(m->count == 10) {
+        const struct timespec old = m->t;
+        mark_set(m);
+        const time_t secs = m->t.tv_sec - old.tv_sec;
+        const time_t nanos = m->t.tv_nsec - old.tv_nsec;
+        const double freq = 10/(secs + ((double)nanos)/1000000000);
+        info("%s: %fHz", what, freq);
+    }
+}
+
+static void render(void)
 {
     clear(cur_page);
     draw_rect(0   + 5*ctx.frame, 0  , 300, 300, 0xff0000);
@@ -106,8 +137,11 @@ void midi_next(void)
 
     switch(ev->type) {
     case SND_SEQ_EVENT_CLOCK:
+        mark_tick(&ctx.syncs, "syncs");
+
         if(ctx.sync % 24 == 0) {
             render();
+            mark_tick(&ctx.frames, "frames");
         }
         ctx.sync += 1;
         break;
@@ -125,6 +159,8 @@ void midi_next(void)
 int main(int argc, char* argv[])
 {
     midi_initialize(20, 0);
+    mark_set(&ctx.syncs);
+    mark_set(&ctx.frames);
 
     assert(argc == 2);
     const char* const fbfn = argv[1];

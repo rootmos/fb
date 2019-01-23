@@ -7,6 +7,8 @@ GCC_TARBALL=gcc-8.2.0.tar.gz
 GCC_URL=$(MIRROR)/gnu/gcc/gcc-8.2.0/$(GCC_TARBALL)
 GLIBC_TARBALL=glibc-2.28.tar.gz
 GLIBC_URL=$(MIRROR)/glibc/$(GLIBC_TARBALL)
+ALSA_TARBALL=alsa-lib-1.0.27.tar.bz2
+ALSA_URL=ftp://ftp.alsa-project.org/pub/lib/$(ALSA_TARBALL)
 
 LINUX_TARBALL=raspberrypi-kernel_1.20181112-1.tar.gz
 LINUX_URL=https://github.com/raspberrypi/linux/archive/$(LINUX_TARBALL)
@@ -25,6 +27,7 @@ all:
 	$(MAKE) install-libgcc
 	$(MAKE) install-glibc
 	$(MAKE) install-gcc
+	$(MAKE) install-alsa
 
 # binutils
 ###############################################################################
@@ -67,6 +70,16 @@ $(LINUX_TARBALL):
 
 linux: $(LINUX_TARBALL)
 	tar -xf $< --transform='s,^[^/]\+/,linux/,'
+
+# alsa
+###############################################################################
+
+$(ALSA_TARBALL):
+	$(FETCH) $@ $(ALSA_URL)
+
+alsa: $(ALSA_TARBALL)
+	mkdir -p $@
+	tar -xf $< --strip-components=1 -C $@
 
 # misc
 ###############################################################################

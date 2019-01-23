@@ -10,12 +10,20 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <alsa/asoundlib.h>
+
 struct fb_fix_screeninfo fi;
 struct fb_var_screeninfo vi;
 int fbfd = -1;
 char* fb = NULL;
 size_t page_size = 0;
 uint_fast8_t cur_page = 0;
+
+struct context {
+    snd_seq_t* seq;
+};
+
+struct context ctx;
 
 static void clear(uint_fast8_t page)
 {
@@ -41,8 +49,19 @@ static void draw_rect(const size_t x, const size_t y,
     }
 }
 
+static void initialize_alsa(void)
+{
+    int r = snd_seq_open(&ctx.seq, "default", SND_SEQ_OPEN_INPUT, 0);
+    if(r != 0) { failwith("unable to open ALSA sequencer"); }
+
+    int client_id = snd_seq_client_id(ctx.seq);
+    info("client_id=%d", client_id);
+}
+
 int main(int argc, char* argv[])
 {
+    initialize_alsa();
+
     assert(argc == 2);
     const char* const fbfn = argv[1];
     fbfd = open(fbfn, O_RDWR); CHECK(fbfd, "open(%s, O_RDWR)", fbfn);
@@ -70,7 +89,7 @@ int main(int argc, char* argv[])
     page_size = fi.line_length * vi.yres;
     memset(fb, 0, fi.smem_len);
 
-    for(size_t i = 0; i < 600; i += 10) {
+    for(size_t i = 0; i < 300; i += 100) {
         clear(cur_page);
         draw_rect(0   + i, 0  , 300, 300, 0xff0000);
         draw_rect(300 + i, 300, 300, 300, 0x00ff00);

@@ -1,8 +1,10 @@
 TOOLCHAIN=$(shell realpath toolchain/root)
 CC=$(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
 LD=$(CC)
-CFLAGS ?= -Wall -Werror -pedantic -O2
-LDFLAGS ?=
+CFLAGS = -Wall -Werror -I$(TOOLCHAIN)/include
+EXTRA_CFLAGS ?= -O2
+LDFLAGS = -L$(TOOLCHAIN)/lib -lasound
+EXTRA_LDFLAGS ?=
 SRC=$(shell git ls-files)
 
 FB=/dev/fb0

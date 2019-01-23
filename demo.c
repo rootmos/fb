@@ -7,6 +7,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <string.h>
+#include <unistd.h>
 
 struct fb_fix_screeninfo fi;
 struct fb_var_screeninfo vi;

@@ -21,9 +21,50 @@ size_t page_size = 0;
 uint_fast8_t cur_page = 0;
 
 struct mark {
+    const char* what;
+    double factor;
+    const char* unit;
+
     struct timespec t;
     size_t count;
+    size_t check_period;
 };
+
+static void mark_set(struct mark* const m)
+{
+    int r = clock_gettime(CLOCK_MONOTONIC_RAW, &m->t);
+    CHECK(r, "clock_gettime(CLOCK_MONOTONIC_RAW, ..)");
+
+    m->count = 0;
+}
+
+static void mark_init(struct mark* const m,
+                      const char* const what,
+                      const double factor,
+                      const char* const unit,
+                      const size_t check_period)
+{
+    m->what = what;
+    m->factor = factor;
+    m->unit = unit;
+    m->check_period = check_period;
+    mark_set(m);
+}
+
+static void mark_tick(struct mark* const m)
+{
+    m->count += 1;
+
+    if(m->count == m->check_period) {
+        const struct timespec old = m->t;
+        mark_set(m);
+        const time_t secs = m->t.tv_sec - old.tv_sec;
+        const time_t nanos = m->t.tv_nsec - old.tv_nsec;
+        const double freq =
+            m->check_period/(secs + ((double)nanos)/1000000000) * m->factor;
+        info("%s: %f%s", m->what, freq, m->unit);
+    }
+}
 
 struct context {
     snd_seq_t* seq;
@@ -86,29 +127,7 @@ static void midi_initialize(const int src_client, const int src_port)
          snd_seq_client_id(ctx.seq), ctx.seq_input_port);
 }
 
-static void mark_set(struct mark* const m)
-{
-    int r = clock_gettime(CLOCK_MONOTONIC_RAW, &m->t);
-    CHECK(r, "clock_gettime(CLOCK_MONOTONIC_RAW, ..)");
-
-    m->count = 0;
-}
-
-static void mark_tick(struct mark* const m, const char* const what)
-{
-    m->count += 1;
-
-    if(m->count == 10) {
-        const struct timespec old = m->t;
-        mark_set(m);
-        const time_t secs = m->t.tv_sec - old.tv_sec;
-        const time_t nanos = m->t.tv_nsec - old.tv_nsec;
-        const double freq = 10/(secs + ((double)nanos)/1000000000);
-        info("%s: %fHz", what, freq);
-    }
-}
-
-static void render(void)
+void render(void)
 {
     clear(cur_page);
     draw_rect(0   + 5*ctx.frame, 0  , 300, 300, 0xff0000);
@@ -137,11 +156,11 @@ void midi_next(void)
 
     switch(ev->type) {
     case SND_SEQ_EVENT_CLOCK:
-        mark_tick(&ctx.syncs, "syncs");
+        mark_tick(&ctx.syncs);
 
         if(ctx.sync % 24 == 0) {
-            render();
-            mark_tick(&ctx.frames, "frames");
+            /*render();*/
+            mark_tick(&ctx.frames);
         }
         ctx.sync += 1;
         break;
@@ -159,8 +178,8 @@ void midi_next(void)
 int main(int argc, char* argv[])
 {
     midi_initialize(20, 0);
-    mark_set(&ctx.syncs);
-    mark_set(&ctx.frames);
+    mark_init(&ctx.syncs, "tempo", (double)60/24, "BPM", 100);
+    mark_init(&ctx.frames, "fps", 1, "", 5);
 
     assert(argc == 2);
     const char* const fbfn = argv[1];

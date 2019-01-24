@@ -13,6 +13,16 @@
     } \
 } while(0)
 
+#ifdef SND_LIB_VERSION
+#define CHECK_ALSA(err, format, ...) do { \
+    if(err < 0) { \
+        __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
+                   __extension__ __LINE__, 0, \
+                   format ": %s\n", ##__VA_ARGS__, snd_strerror(err)); \
+    } \
+} while(0)
+#endif
+
 #define info(format, ...) do { \
     __info(__extension__ __FUNCTION__, __extension__ __FILE__, \
            __extension__ __LINE__, format "\n", ##__VA_ARGS__); \
@@ -39,5 +49,5 @@ void __info(const char* const caller,
 
 const char* getenv_mandatory(const char* const env);
 
-// returns current time formated as: 20190123T182628Z
+// returns current time formated as compact ISO8601: 20190123T182628Z
 const char* now_iso8601(void);

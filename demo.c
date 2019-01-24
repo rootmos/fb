@@ -1,3 +1,5 @@
+#include <alsa/asoundlib.h>
+
 #include "util.h"
 
 #include <linux/fb.h>
@@ -11,7 +13,6 @@
 #include <unistd.h>
 #include <time.h>
 
-#include <alsa/asoundlib.h>
 
 struct fb_fix_screeninfo fi;
 struct fb_var_screeninfo vi;
@@ -107,20 +108,20 @@ static void midi_initialize(const int src_client, const int src_port)
     memset(&ctx, 0, sizeof(ctx));
 
     int r = snd_seq_open(&ctx.seq, "default", SND_SEQ_OPEN_INPUT, 0);
-    if(r != 0) { failwith("unable to open ALSA sequencer"); }
+    CHECK_ALSA(r, "unable to open ALSA sequencer");
 
     r = snd_seq_set_client_name(ctx.seq, "demo");
-    if(r != 0) { failwith("unable to set client name"); }
+    CHECK_ALSA(r, "unable to set client name");
 
     r = snd_seq_create_simple_port(
         ctx.seq, "input port",
         SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
         SND_SEQ_PORT_TYPE_MIDI_GENERIC);
-    if (r < 0) { failwith("unable to create input port"); }
+    CHECK_ALSA(r, "unable to create input port");
     ctx.seq_input_port = r;
 
     r = snd_seq_connect_from(ctx.seq, ctx.seq_input_port, src_client, src_port);
-    if (r < 0) { failwith("unable to connect to source port"); }
+    CHECK_ALSA(r, "unable to connect to source port");
 
     info("%d:%d -> %d:%d",
          src_client, src_port,
@@ -150,9 +151,7 @@ void midi_next(void)
 {
     snd_seq_event_t* ev;
     int r = snd_seq_event_input(ctx.seq, &ev);
-    if(r < 0) {
-        failwith("unable to retrieve input command: %s", snd_strerror(r));
-    }
+    CHECK_ALSA(r, "unable to retrieve input command");
 
     switch(ev->type) {
     case SND_SEQ_EVENT_CLOCK:
@@ -170,9 +169,7 @@ void midi_next(void)
     }
 
     r = snd_seq_free_event(ev);
-    if(r < 0) {
-        failwith("unable to free event: %s", snd_strerror(r));
-    }
+    CHECK_ALSA(r, "unable to free event");
 }
 
 int main(int argc, char* argv[])

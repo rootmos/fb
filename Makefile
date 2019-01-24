@@ -1,10 +1,10 @@
-TOOLCHAIN=$(shell realpath toolchain/root)
-CC=$(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
+export PREFIX=$(shell readlink -f ./root)
+CC=$(PREFIX)/bin/arm-linux-gnueabihf-gcc
 LD=$(CC)
-CFLAGS = -Wall -Werror -I$(TOOLCHAIN)/include
+CFLAGS = -Wall -Werror -I$(PREFIX)/include
 EXTRA_CFLAGS ?= -O2
-LDFLAGS = -L$(TOOLCHAIN)/lib -lasound
 EXTRA_LDFLAGS ?=
+LIBS = -L$(PREFIX)/lib -lasound -l:libr.a
 SRC=$(shell git ls-files)
 
 FB=/dev/fb0
@@ -19,11 +19,14 @@ deploy: demo
 run: demo
 	./$< > /dev/fb0
 
-demo: demo.o util.o
-	$(LD) $(LDFLAGS) -o $@ $^
+demo: demo.o
+	$(LD) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
 toolchain:
 	$(MAKE) -C $@
+
+libr:
+	$(MAKE) -C $@ install CC=$(CC) LD=$(LD)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c $<
@@ -31,4 +34,4 @@ toolchain:
 clean:
 	rm -rf *.o demo
 
-.PHONY: run clean toolchain deploy
+.PHONY: run clean toolchain deploy libr

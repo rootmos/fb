@@ -1,6 +1,6 @@
 #include <alsa/asoundlib.h>
 
-#include "util.h"
+#include <r.h>
 
 #include <linux/fb.h>
 #include <linux/ioctl.h>

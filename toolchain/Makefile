@@ -13,7 +13,7 @@ ALSA_URL=ftp://ftp.alsa-project.org/pub/lib/$(ALSA_TARBALL)
 LINUX_TARBALL=raspberrypi-kernel_1.20181112-1.tar.gz
 LINUX_URL=https://github.com/raspberrypi/linux/archive/$(LINUX_TARBALL)
 
-export PREFIX=$(shell realpath root)
+export PREFIX ?= $(shell realpath root)
 export BUILD_ROOT=$(shell realpath build)
 export PATH:=$(PREFIX)/bin:$(PATH)
 

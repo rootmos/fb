@@ -1,6 +1,5 @@
 *.tar.gz
 *.tar.bz2
-root
 linux
 gcc
 glibc

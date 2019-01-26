@@ -14,13 +14,6 @@
 #include <time.h>
 
 
-struct fb_fix_screeninfo fi;
-struct fb_var_screeninfo vi;
-int fbfd = -1;
-char* fb = NULL;
-size_t page_size = 0;
-uint_fast8_t cur_page = 0;
-
 struct mark {
     const char* what;
     double factor;
@@ -67,29 +60,42 @@ static void mark_tick(struct mark* const m)
     }
 }
 
-struct context {
+struct {
     snd_seq_t* seq;
     int seq_input_port;
     size_t sync;
     size_t frame;
 
+    struct fb_fix_screeninfo fi;
+    struct fb_var_screeninfo vi;
+    struct fb_var_screeninfo orig_vi;
+    int fbfd;
+    char* fb;
+    size_t page_size;
+    uint_fast8_t cur_page;
+
     struct mark frames;
     struct mark syncs;
-};
+} ctx;
 
-struct context ctx;
+static void initialize_context(void)
+{
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.fbfd = -1;
+}
 
 static void clear(uint_fast8_t page)
 {
-    memset(fb + page_size * page, 0, page_size);
+    memset(ctx.fb + ctx.page_size * page, 0, ctx.page_size);
 }
 
 typedef uint_fast32_t color_t;
 
 static inline void put_pixel(const size_t x, const size_t y, const color_t c)
 {
-    const size_t off = (x * 3) + y * fi.line_length + cur_page * page_size;
-    memcpy(fb + off, &c, 3);
+    const size_t off =
+        (x * 3) + y * ctx.fi.line_length + ctx.cur_page * ctx.page_size;
+    memcpy(ctx.fb + off, &c, 3);
 }
 
 static void draw_rect(const size_t x, const size_t y,
@@ -130,20 +136,19 @@ static void midi_initialize(const int src_client, const int src_port)
 
 void render(void)
 {
-    clear(cur_page);
+    clear(ctx.cur_page);
     draw_rect(0   + 5*ctx.frame, 0  , 300, 300, 0xff0000);
     draw_rect(300 + 5*ctx.frame, 300, 300, 300, 0x00ff00);
     draw_rect(600 + 5*ctx.frame, 600, 300, 300, 0x0000ff);
 
-    vi.yoffset = cur_page * vi.yres;
-    vi.activate = FB_ACTIVATE_VBL;
-    int r = ioctl(fbfd, FBIOPAN_DISPLAY, &vi);
+    ctx.vi.yoffset = ctx.cur_page * ctx.vi.yres;
+    ctx.vi.activate = FB_ACTIVATE_VBL;
+    int r = ioctl(ctx.fbfd, FBIOPAN_DISPLAY, &ctx.vi);
     CHECK(r, "ioctl(FBIOPAN_DISPLAY)");
-    r = ioctl(fbfd, FBIO_WAITFORVSYNC, NULL);
+    r = ioctl(ctx.fbfd, FBIO_WAITFORVSYNC, NULL);
     CHECK(r, "ioctl(FBIO_WAITFORVSYNC)");
 
-    cur_page = (cur_page + 1) % 2;
-
+    ctx.cur_page = (ctx.cur_page + 1) % 2;
     ctx.frame += 1;
 }
 
@@ -172,49 +177,60 @@ void midi_next(void)
     CHECK_ALSA(r, "unable to free event");
 }
 
+void open_framebuffer(const char* const fbfn)
+{
+    ctx.fbfd = open(fbfn, O_RDWR); CHECK(ctx.fbfd, "open(%s, O_RDWR)", fbfn);
+
+    int r = ioctl(ctx.fbfd, FBIOGET_VSCREENINFO, &ctx.orig_vi);
+    CHECK(r, "ioctl(FBIOGET_VSCREENINFO)");
+    memcpy(&ctx.vi, &ctx.orig_vi, sizeof(ctx.vi));
+
+    ctx.vi.bits_per_pixel = 24;
+    ctx.vi.xres_virtual = ctx.vi.xres;
+    ctx.vi.yres_virtual = ctx.vi.yres * 2;
+    r = ioctl(ctx.fbfd, FBIOPUT_VSCREENINFO, &ctx.vi);
+    CHECK(r, "ioctl(FBIOPUT_VSCREENINFO)");
+
+    info("framebuffer: %" PRIu32 "x%" PRIu32", %" PRIu32 "bpp",
+         ctx.vi.xres, ctx.vi.yres, ctx.vi.bits_per_pixel);
+
+    r = ioctl(ctx.fbfd, FBIOGET_FSCREENINFO, &ctx.fi);
+    CHECK(r, "ioctl(FBIOGET_FSCREENINFO)");
+
+    ctx.fb = mmap(NULL, ctx.fi.smem_len,
+                  PROT_READ | PROT_WRITE, MAP_SHARED, ctx.fbfd, 0);
+    CHECK_NOT(ctx.fb, MAP_FAILED, "mmap(fbfd)");
+
+    ctx.page_size = ctx.fi.line_length * ctx.vi.yres;
+    memset(ctx.fb, 0, ctx.fi.smem_len);
+}
+
+void close_framebuffer(void)
+{
+    int r = ioctl(ctx.fbfd, FBIOPUT_VSCREENINFO, &ctx.orig_vi);
+    CHECK(r, "ioctl(FBIOPUT_VSCREENINFO)");
+
+    r = close(ctx.fbfd); CHECK(r, "close(fbfd)");
+    r = munmap(ctx.fb, ctx.fi.smem_len); CHECK(r, "munmap");
+}
+
+
 int main(int argc, char* argv[])
 {
+    initialize_context();
+
     midi_initialize(20, 0);
     mark_init(&ctx.syncs, "tempo", (double)60/24, "BPM", 100);
     mark_init(&ctx.frames, "fps", 1, "", 5);
 
     assert(argc == 2);
-    const char* const fbfn = argv[1];
-    fbfd = open(fbfn, O_RDWR); CHECK(fbfd, "open(%s, O_RDWR)", fbfn);
-
-    struct fb_var_screeninfo orig_vi;
-    int r = ioctl(fbfd, FBIOGET_VSCREENINFO, &orig_vi);
-    CHECK(r, "ioctl(FBIOGET_VSCREENINFO)");
-    memcpy(&vi, &orig_vi, sizeof(vi));
-
-    vi.bits_per_pixel = 24;
-    vi.xres_virtual = vi.xres;
-    vi.yres_virtual = vi.yres * 2;
-    r = ioctl(fbfd, FBIOPUT_VSCREENINFO, &vi);
-    CHECK(r, "ioctl(FBIOPUT_VSCREENINFO)");
-
-    info("framebuffer: %" PRIu32 "x%" PRIu32", %" PRIu32 "bpp",
-         vi.xres, vi.yres, vi.bits_per_pixel);
-
-    r = ioctl(fbfd, FBIOGET_FSCREENINFO, &fi);
-    CHECK(r, "ioctl(FBIOGET_FSCREENINFO)");
-
-    fb = mmap(NULL, fi.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
-    CHECK_NOT(fb, MAP_FAILED, "mmap(fbfd)");
-
-    page_size = fi.line_length * vi.yres;
-    memset(fb, 0, fi.smem_len);
+    open_framebuffer(argv[1]);
 
     while(1) {
         midi_next();
     }
 
-
-    r = ioctl(fbfd, FBIOPUT_VSCREENINFO, &orig_vi);
-    CHECK(r, "ioctl(FBIOPUT_VSCREENINFO)");
-
-    r = close(fbfd); CHECK(r, "close(fbfd)");
-    r = munmap(fb, fi.smem_len); CHECK(r, "munmap");
+    close_framebuffer();
 
     return 0;
 }

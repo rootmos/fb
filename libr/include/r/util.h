@@ -1,5 +1,8 @@
 #pragma once
 
+#define LENGTH(xs) (sizeof(xs)/sizeof((xs)[0]))
+
+
 #define CHECK(res, format, ...) CHECK_NOT(res, -1, format, ##__VA_ARGS__)
 
 #define CHECK_NOT(res, err, format, ...) \

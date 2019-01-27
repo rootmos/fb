@@ -2,17 +2,19 @@
 
 #include <r.h>
 
+#include <assert.h>
+#include <fcntl.h>
+#include <inttypes.h>
 #include <linux/fb.h>
 #include <linux/ioctl.h>
-#include <stropts.h>
-#include <inttypes.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <assert.h>
 #include <string.h>
-#include <unistd.h>
+#include <stropts.h>
+#include <sys/eventfd.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
+#include <sys/signal.h>
 #include <time.h>
-
+#include <unistd.h>
 
 struct mark {
     const char* what;
@@ -84,7 +86,7 @@ static void initialize_context(void)
     ctx.fbfd = -1;
 }
 
-static void clear(uint_fast8_t page)
+static void clear(const uint_fast8_t page)
 {
     memset(ctx.fb + ctx.page_size * page, 0, ctx.page_size);
 }
@@ -111,8 +113,6 @@ static void draw_rect(const size_t x, const size_t y,
 
 static void midi_initialize(const int src_client, const int src_port)
 {
-    memset(&ctx, 0, sizeof(ctx));
-
     int r = snd_seq_open(&ctx.seq, "default", SND_SEQ_OPEN_INPUT, 0);
     CHECK_ALSA(r, "unable to open ALSA sequencer");
 
@@ -150,6 +150,31 @@ void render(void)
 
     ctx.cur_page = (ctx.cur_page + 1) % 2;
     ctx.frame += 1;
+}
+
+static void renderer_main(const int efd)
+{
+    eventfd_t v;
+    int r = eventfd_read(efd, &v); CHECK(r, "eventfd_read");
+    info("event: %" SCNu64, v);
+
+    exit(0);
+}
+
+void renderer_start(void)
+{
+    int p[2];
+    int r = pipe(p); CHECK(r, "pipe");
+    int efd = eventfd(0, 0); CHECK(efd, "eventfd");
+    const pid_t pid = fork(); CHECK(pid, "fork");
+    if(pid == 0) {
+        r = prctl(PR_SET_PDEATHSIG, SIGKILL);
+        CHECK(r, "prctl(PR_SET_PDEATHSIG)");
+        renderer_main(efd);
+    } else {
+        r = close(p[0]); CHECK(r, "close(p[0])");
+        info("renderer: pid=%d", pid);
+    }
 }
 
 void midi_next(void)
@@ -214,12 +239,13 @@ void close_framebuffer(void)
     r = munmap(ctx.fb, ctx.fi.smem_len); CHECK(r, "munmap");
 }
 
-
 int main(int argc, char* argv[])
 {
     initialize_context();
+    renderer_start();
 
     midi_initialize(20, 0);
+
     mark_init(&ctx.syncs, "tempo", (double)60/24, "BPM", 100);
     mark_init(&ctx.frames, "fps", 1, "", 5);
 

@@ -2,10 +2,16 @@
 #include "demo.h"
 #include "fb.h"
 
+#define KNOB(k, scale) ((scale)*st->knob[(k) - 1]/127)
+#define BUTTON(b) (st->button[(b) - 1])
+
 struct state {
     size_t ticks;
     size_t bars;
     size_t qn;
+
+    unsigned button[16];
+    unsigned char knob[16];
 };
 
 struct state* demo_fresh_state(void)
@@ -59,18 +65,15 @@ void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
     // interpret beatstep's control mode knobs and buttons
     if(ctrl->channel == 0) {
         if(ctrl->param > 15 && ctrl->param <= 31) {
-            const unsigned char knob = ctrl->param - 15;
-            info("knob %u: %d", knob, ctrl->value);
+            st->knob[ctrl->param - 16] = ctrl->value;
             return;
         } else if(ctrl->param > 35 && ctrl->param <= 51) {
-            const unsigned char button = ctrl->param - 35;
             if(ctrl->value == 127) {
-                info("button %u ON", button);
-                return;
+                st->button[ctrl->param - 36] = 1;
             } else if(ctrl->value == 0) {
-                info("button %u OFF", button);
-                return;
+                st->button[ctrl->param - 36] = 0;
             }
+            return;
         }
     }
 
@@ -79,7 +82,11 @@ void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
 
 void demo_render(const struct state* const st)
 {
-    fb_rect(0   + 100*st->qn, 0  , 300, 300, 0xff0000);
-    fb_rect(300 + 100*st->qn, 300, 300, 300, 0x00ff00);
-    fb_rect(600 + 100*st->qn, 600, 300, 300, 0x0000ff);
+    color_t c = KNOB(3, 0xffffff);
+    const size_t h = KNOB(1, 300);
+    const size_t w = KNOB(2, 300);
+
+    if(BUTTON(1)) fb_rect(0 + 100*st->qn, 0  , h, w, c);
+    if(BUTTON(2)) fb_rect(w + 100*st->qn, h, h, w, c);
+    if(BUTTON(3)) fb_rect(2*w + 100*st->qn, 2*h, h, w, c);
 }

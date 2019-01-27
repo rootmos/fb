@@ -77,11 +77,11 @@ void fb_flip(void)
     ctx.frame += 1;
 }
 
-void fb_pixel(const size_t x, const size_t y, const color_t c)
+inline void fb_pixel(const size_t x, const size_t y, const color_t c)
 {
     const size_t off =
         (x * 3) + y * ctx.fi.line_length + ctx.cur_page * ctx.page_size;
-    memcpy(ctx.fb + off, &c, 3);
+    *(color_t*)(ctx.fb + off) = c;
 }
 
 void fb_rect(const size_t x, const size_t y, const size_t h, const size_t w,

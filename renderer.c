@@ -24,13 +24,6 @@ struct renderer {
     struct mark* frames;
 };
 
-static void render(const struct state* const st)
-{
-    fb_rect(0   + 5*st->ticks, 0  , 300, 300, 0xff0000);
-    fb_rect(300 + 5*st->ticks, 300, 300, 300, 0x00ff00);
-    fb_rect(600 + 5*st->ticks, 600, 300, 300, 0x0000ff);
-}
-
 static void renderer_main(const struct renderer* const ctx)
 {
     fb_open(ctx->fbfn);
@@ -41,7 +34,7 @@ static void renderer_main(const struct renderer* const ctx)
         assert(fds[0].revents == POLLIN);
 
         fb_clear();
-        render(ctx->st);
+        demo_render(ctx->st);
 
         fb_flip();
         mark_tick(ctx->frames);
@@ -56,7 +49,7 @@ static void renderer_main(const struct renderer* const ctx)
 
 void renderer_next(struct renderer* const ctx, const struct state* const st)
 {
-    memcpy(ctx->st, st, sizeof(*st));
+    memcpy(ctx->st, st, demo_state_size());
     int r = eventfd_write(ctx->efd, 0xfffffffffffffffe);
     CHECK(r, "eventfd_write");
 }
@@ -73,7 +66,7 @@ struct renderer* renderer_start(const char* const fbfn)
     ctx->frames = mark_init("fps", 1, "", 30);
     ctx->fbfn = fbfn;
 
-    ctx->st = mmap(NULL, sizeof(struct state),
+    ctx->st = mmap(NULL, demo_state_size(),
                    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     CHECK_NOT(ctx->st, MAP_FAILED, "mmap");
 

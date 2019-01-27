@@ -12,8 +12,7 @@ struct {
     snd_seq_t* seq;
     int seq_input_port;
 
-    struct state st;
-
+    struct state* st;
     struct renderer* renderer;
 
     struct mark* syncs;
@@ -60,10 +59,33 @@ void midi_next(void)
         switch(ev->type) {
         case SND_SEQ_EVENT_CLOCK:
             mark_tick(ctx.syncs);
-            demo_tick(&ctx.st);
+            demo_tick(ctx.st);
             break;
 
         case SND_SEQ_EVENT_NOTEON:
+            demo_note_on(ctx.st, &ev->data.note);
+            break;
+
+        case SND_SEQ_EVENT_NOTEOFF:
+            demo_note_off(ctx.st, &ev->data.note);
+            break;
+
+        case SND_SEQ_EVENT_START:
+            demo_start(ctx.st);
+            break;
+
+        case SND_SEQ_EVENT_STOP:
+            demo_stop(ctx.st);
+            break;
+
+        case SND_SEQ_EVENT_CONTINUE:
+            demo_continue(ctx.st);
+            break;
+
+        case SND_SEQ_EVENT_CONTROLLER:
+            demo_ctrl(ctx.st, &ev->data.control);
+            break;
+
         default: break;
         }
 
@@ -90,7 +112,7 @@ void do_poll(void)
 
     // Check on renderer
     if(fds[0].revents == POLLOUT) {
-        renderer_next(ctx.renderer, &ctx.st);
+        renderer_next(ctx.renderer, ctx.st);
     }
 }
 
@@ -100,6 +122,7 @@ int main(int argc, char* argv[])
 
     assert(argc == 2);
     ctx.renderer = renderer_start(argv[1]);
+    ctx.st = demo_fresh_state();
 
     midi_initialize(20, 0);
 

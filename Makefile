@@ -16,7 +16,7 @@ deploy: demo
 	scp $< $(DEPLOY_TARGET)
 	ssh $(DEPLOY_HOST) $(DEPLOY_LOCAL_EXECUTABLE) $(FB)
 
-demo: demo.o fb.o mark.o
+demo: main.o demo.o renderer.o fb.o mark.o
 	$(LD) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
 toolchain:

@@ -1,7 +1,7 @@
 export PREFIX=$(shell readlink -f ./root)
 CC=$(PREFIX)/bin/arm-linux-gnueabihf-gcc
 LD=$(CC)
-CFLAGS = -Wall -Werror -I$(PREFIX)/include
+CFLAGS = -Wall -Werror -Iinclude -I$(PREFIX)/include
 EXTRA_CFLAGS ?= -O2
 EXTRA_LDFLAGS ?=
 LIBS = -L$(PREFIX)/lib -lasound -l:libr.a
@@ -16,7 +16,7 @@ deploy: demo
 	scp $< $(DEPLOY_TARGET)
 	ssh $(DEPLOY_HOST) $(DEPLOY_LOCAL_EXECUTABLE) $(FB)
 
-demo: demo.o
+demo: demo.o fb.o mark.o
 	$(LD) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
 toolchain:

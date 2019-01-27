@@ -80,6 +80,7 @@ void midi_next(void)
             break;
 
         case SND_SEQ_EVENT_CONTINUE:
+            mark_set(ctx.syncs);
             demo_continue(ctx.st);
             break;
 

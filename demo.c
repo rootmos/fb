@@ -4,6 +4,8 @@
 
 struct state {
     size_t ticks;
+    size_t bars;
+    size_t qn;
 };
 
 struct state* demo_fresh_state(void)
@@ -19,14 +21,17 @@ size_t demo_state_size(void)
 
 void demo_tick(struct state* const st)
 {
-    if(st->ticks > 0) {
-        st->ticks -= 5;
+    st->ticks += 1;
+    st->qn = (st->ticks / 24) % 4;
+    if(st->qn == 0) {
+        st->bars += 1;
     }
 }
 
 void demo_start(struct state* const st)
 {
     info("start");
+    st->ticks = 0;
 }
 
 void demo_stop(struct state* const st)
@@ -41,19 +46,12 @@ void demo_continue(struct state* const st)
 
 void demo_note_on(struct state* const st, const snd_seq_ev_note_t* const note)
 {
-    if(note->channel == 9) {
-        st->ticks = 100;
-    } else {
-        info("on: channel=%u note=%u", note->channel, note->note);
-    }
+    info("on: channel=%u note=%u", note->channel, note->note);
 }
 
 void demo_note_off(struct state* const st, const snd_seq_ev_note_t* const note)
 {
-    if(note->channel == 9) {
-    } else {
-        info("off: channel=%u note=%u", note->channel, note->note);
-    }
+    info("off: channel=%u note=%u", note->channel, note->note);
 }
 
 void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
@@ -81,7 +79,7 @@ void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
 
 void demo_render(const struct state* const st)
 {
-    fb_rect(0   + 5*st->ticks, 0  , 300, 300, 0xff0000);
-    fb_rect(300 + 5*st->ticks, 300, 300, 300, 0x00ff00);
-    fb_rect(600 + 5*st->ticks, 600, 300, 300, 0x0000ff);
+    fb_rect(0   + 100*st->qn, 0  , 300, 300, 0xff0000);
+    fb_rect(300 + 100*st->qn, 300, 300, 300, 0x00ff00);
+    fb_rect(600 + 100*st->qn, 600, 300, 300, 0x0000ff);
 }

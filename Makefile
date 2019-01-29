@@ -31,4 +31,7 @@ libr:
 clean:
 	rm -rf *.o demo
 
-.PHONY: run clean toolchain deploy libr
+disable_cursor:
+	ssh $(DEPLOY_HOST) /bin/sh -c "echo -e '\033[?17;0;0c' | sudo tee /dev/tty1"
+
+.PHONY: run clean toolchain deploy libr disable_cursor

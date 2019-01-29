@@ -28,10 +28,16 @@ size_t demo_state_size(void)
 void demo_tick(struct state* const st)
 {
     st->ticks += 1;
-    st->qn = (st->ticks / 24) % 4;
-    if(st->qn == 0) {
-        st->bars += 1;
+    if(st->ticks % 24 == 0) {
+        st->qn += 1;
     }
+    if(st->qn == 4) {
+        st->qn = 0;
+        st->bars += 1;
+        info("new bar");
+    }
+
+    if(st->bars == 2) exit(0);
 }
 
 void demo_start(struct state* const st)
@@ -82,11 +88,14 @@ void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
 
 void demo_render(const struct state* const st)
 {
-    color_t c = KNOB(3, 0xffffff);
-    const size_t h = KNOB(1, 300);
-    const size_t w = KNOB(2, 300);
+    struct fb_info fbi = fb_info();
 
-    if(BUTTON(1)) fb_rect(0 + 100*st->qn, 0  , h, w, c);
-    if(BUTTON(2)) fb_rect(w + 100*st->qn, h, h, w, c);
-    if(BUTTON(3)) fb_rect(2*w + 100*st->qn, 2*h, h, w, c);
+    const color_t c = 3;
+    const size_t h = fbi.yres / 3;
+    const size_t w = fbi.xres / 6;
+
+    fb_clear(0);
+    fb_rect(0 + st->ticks, 0, h, w, c);
+    fb_rect(w + st->ticks, h, h, w, c);
+    fb_rect(2*w + st->ticks, 2*h, h, w, c);
 }

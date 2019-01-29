@@ -33,7 +33,6 @@ static void renderer_main(const struct renderer* const ctx)
         int r = poll(fds, 1, -1); CHECK(r, "poll");
         assert(fds[0].revents == POLLIN);
 
-        fb_clear();
         demo_render(ctx->st);
 
         fb_flip();

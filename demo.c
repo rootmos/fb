@@ -28,16 +28,10 @@ size_t demo_state_size(void)
 void demo_tick(struct state* const st)
 {
     st->ticks += 1;
-    if(st->ticks % 24 == 0) {
-        st->qn += 1;
-    }
-    if(st->qn == 4) {
-        st->qn = 0;
+    st->qn = (st->ticks / 24) % 4;
+    if(st->qn == 0) {
         st->bars += 1;
-        info("new bar");
     }
-
-    if(st->bars == 2) exit(0);
 }
 
 void demo_start(struct state* const st)
@@ -68,6 +62,8 @@ void demo_note_off(struct state* const st, const snd_seq_ev_note_t* const note)
 
 void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
 {
+    info("ctrl %u: %u=%d", ctrl->channel, ctrl->param, ctrl->value);
+
     // interpret beatstep's control mode knobs and buttons
     if(ctrl->channel == 0) {
         if(ctrl->param > 15 && ctrl->param <= 31) {
@@ -82,20 +78,16 @@ void demo_ctrl(struct state* const st, const snd_seq_ev_ctrl_t* const ctrl)
             return;
         }
     }
-
-    info("ctrl %u: %u=%d", ctrl->channel, ctrl->param, ctrl->value);
 }
 
 void demo_render(const struct state* const st)
 {
-    struct fb_info fbi = fb_info();
-
-    const color_t c = 3;
-    const size_t h = fbi.yres / 3;
-    const size_t w = fbi.xres / 6;
-
     fb_clear(0);
-    fb_rect(0 + st->ticks, 0, h, w, c);
-    fb_rect(w + st->ticks, h, h, w, c);
-    fb_rect(2*w + st->ticks, 2*h, h, w, c);
+    color_t c = KNOB(3, 0xff);
+    const size_t h = KNOB(1, 100);
+    const size_t w = KNOB(2, 100);
+
+    if(BUTTON(1)) fb_rect(0 + 10*st->qn, 0  , h, w, c);
+    if(BUTTON(2)) fb_rect(w + 10*st->qn, h, h, w, c);
+    if(BUTTON(3)) fb_rect(2*w + 10*st->qn, 2*h, h, w, c);
 }

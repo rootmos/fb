@@ -1,35 +1,49 @@
-export PREFIX=$(shell readlink -f ./root)
-CC=$(PREFIX)/bin/arm-linux-gnueabihf-gcc
-LD=$(CC)
-CFLAGS = -Wall -Werror -Iinclude -I$(PREFIX)/include
+BUILD=$(shell readlink -f ./build)
+TOOLCHAIN=$(shell readlink -f ./root)
+
+CFLAGS = -Wall -Werror -Iinclude -I$(BUILD)/include
+LDFLAGS = -L$(BUILD)/lib
 EXTRA_CFLAGS ?= -O2
 EXTRA_LDFLAGS ?=
-LIBS = -L$(PREFIX)/lib -lasound -l:libr.a
-SRC=$(shell git ls-files)
 
-FB=/dev/fb0
+ifdef X
+export CC = $(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
+export LD = $(CC)
+LDFLAGS += -L$(TOOLCHAIN)/lib
+CFLAGS += -I$(TOOLCHAIN)/include
+else
+export CC = gcc
+export LD = $(CC)
+endif
+
+LIBS = -lasound -l:libr.a
+SRC = $(shell git ls-files)
+
+DEPLOY_FB=/dev/fb0
 DEPLOY_HOST=pi@192.168.1.166
 DEPLOY_TARGET=$(DEPLOY_HOST):demo
 DEPLOY_LOCAL_EXECUTABLE=./demo
 
+demo: main.o demo.o renderer.o fb.o mark.o
+	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
+
 deploy: demo
 	scp $< $(DEPLOY_TARGET)
-	ssh $(DEPLOY_HOST) $(DEPLOY_LOCAL_EXECUTABLE) $(FB)
-
-demo: main.o demo.o renderer.o fb.o mark.o
-	$(LD) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
+	ssh $(DEPLOY_HOST) $(DEPLOY_LOCAL_EXECUTABLE) $(DEPLOY_FB)
 
 toolchain:
-	$(MAKE) -C $@
+	$(MAKE) -C $@ PREFIX=$(TOOLCHAIN)
 
 libr:
-	$(MAKE) -C $@ install CC=$(CC) LD=$(LD)
+	$(MAKE) -C $@ install PREFIX=$(BUILD)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c $<
 
 clean:
-	rm -rf *.o demo
+	$(MAKE) -C libr clean
+	rm -rf $(BUILD) *.o demo
+	rm -f *.o demo
 
 disable_cursor:
 	ssh $(DEPLOY_HOST) /bin/sh -c "echo -e '\033[?17;0;0c' | sudo tee /dev/tty1"

@@ -2,3 +2,4 @@ demo
 demo.tar.gz
 *.o
 root
+build

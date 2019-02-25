@@ -27,6 +27,9 @@ DEPLOY_LOCAL_EXECUTABLE=./demo
 demo: main.o demo.o renderer.o fb.o mark.o
 	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
+ametro: ametro.c
+	$(CC) -o $@ -lasound $<
+
 deploy: demo
 	scp $< $(DEPLOY_TARGET)
 	ssh $(DEPLOY_HOST) $(DEPLOY_LOCAL_EXECUTABLE) $(DEPLOY_FB)

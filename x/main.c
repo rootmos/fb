@@ -26,26 +26,39 @@ int main(int argc, char** argv)
 {
     int s;
     xcb_connection_t* con = xcb_connect(NULL, &s);
-    xcb_screen_t* sc = fetch_screen(con, s);
+    int r = xcb_connection_has_error(con);
+    if(r != 0) { failwith("xcb_connection_has_error(...) == %d", r); }
 
+    xcb_screen_t* sc = fetch_screen(con, s);
     dump_screen_info(sc);
+
     xcb_window_t wi = xcb_generate_id(con);
 
-    xcb_create_window(con, XCB_COPY_FROM_PARENT,
-                      wi, sc->root,
-                      /* x, y */ 0, 0,
-                      /* w, h */ 150, 150,
-                      /* border */ 1,
-                      XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                      sc->root_visual,
-                      XCB_CW_EVENT_MASK,
-                      &(int[]){ XCB_EVENT_MASK_KEY_PRESS });
+    xcb_void_cookie_t c = xcb_create_window_checked(
+        con, XCB_COPY_FROM_PARENT,
+        wi, sc->root,
+        /* x, y */ 0, 0,
+        /* w, h */ 150, 150,
+        /* border */ 1,
+        XCB_WINDOW_CLASS_INPUT_OUTPUT,
+        sc->root_visual,
+        XCB_CW_EVENT_MASK,
+        &(int[]){ XCB_EVENT_MASK_KEY_PRESS });
+    xcb_generic_error_t* err = xcb_request_check(con, c);
+    if(err) {
+        failwith("xcb_create_window_checked failed: %u", err->error_code);
+    }
 
-    xcb_map_window(con, wi);
+    c = xcb_map_window_checked(con, wi);
+    err = xcb_request_check(con, c);
+    if(err) {
+        failwith("xcb_map_window_checked failed: %u", err->error_code);
+    }
 
     xcb_key_symbols_t* syms = xcb_key_symbols_alloc(con);
 
-    xcb_flush(con);
+    r = xcb_flush(con);
+    if(r <= 0) { failwith("xcb_flush(...) == %d", r); }
 
     xcb_generic_event_t* e; int bail = 0;
     while(!bail && (e = xcb_wait_for_event(con))) {

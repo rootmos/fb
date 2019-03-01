@@ -1,12 +1,13 @@
-CFLAGS = -Wall -Werror
-LDFLAGS =
+BUILD ?= ../build
+CFLAGS = -Wall -Werror -I$(BUILD)/include
+LDFLAGS = -L$(BUILD)/lib
 EXTRA_CFLAGS ?= -O2
 EXTRA_LDFLAGS ?=
 
 CC = gcc
 LD = $(CC)
 
-LIBS =
+LIBS = -lxcb -lxcb-keysyms -l:libr.a
 SRC = $(shell git ls-files)
 
 run: main

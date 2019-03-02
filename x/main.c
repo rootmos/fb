@@ -50,15 +50,19 @@ int main(int argc, char** argv)
     }
 
     c = xcb_map_window_checked(con, wi);
-    err = xcb_request_check(con, c);
-    if(err) {
+    if((err = xcb_request_check(con, c))) {
         failwith("xcb_map_window_checked failed: %u", err->error_code);
+    }
+
+    xcb_gcontext_t gc = xcb_generate_id(con);
+    c = xcb_create_gc_checked(con, gc, sc->root, 0, NULL);
+    if((err = xcb_request_check(con, c))) {
+        failwith("xcb_create_gc_checked failed: %u", err->error_code);
     }
 
     xcb_key_symbols_t* syms = xcb_key_symbols_alloc(con);
 
-    r = xcb_flush(con);
-    if(r <= 0) { failwith("xcb_flush(...) == %d", r); }
+    if((r = xcb_flush(con)) <= 0) { failwith("xcb_flush(...) == %d", r); }
 
     xcb_generic_event_t* e; int bail = 0;
     while(!bail && (e = xcb_wait_for_event(con))) {

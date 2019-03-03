@@ -1,7 +1,7 @@
 BUILD ?= ../build
 CFLAGS = -Wall -Werror -I$(BUILD)/include
 LDFLAGS = -L$(BUILD)/lib
-EXTRA_CFLAGS ?= -O2
+EXTRA_CFLAGS ?= -O1 -g
 EXTRA_LDFLAGS ?=
 
 CC = gcc
@@ -11,7 +11,10 @@ LIBS = -lxcb -lxcb-keysyms -l:libr.a
 SRC = $(shell git ls-files)
 
 run: main
-	./$<
+	timeout 0.5 ./$<
+
+gdb: main
+	gdb $<
 
 main: main.o
 	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
@@ -22,4 +25,4 @@ main: main.o
 clean:
 	rm -f *.o main
 
-.PHONY: run clean
+.PHONY: run clean gdb

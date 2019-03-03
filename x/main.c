@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 #include <X11/keysym.h>
@@ -17,59 +18,120 @@ static xcb_screen_t* fetch_screen(xcb_connection_t* con, int screen)
     failwith("can't find screen: %d", screen);
 }
 
-static void dump_screen_info(xcb_screen_t* s)
+static void dump_screen_info(xcb_screen_t* s, int n)
 {
-    info("pixels=%dx%d", s->width_in_pixels, s->height_in_pixels);
+    info("screen %d: pixels=%dx%d %dbpp", n,
+         s->width_in_pixels, s->height_in_pixels,
+         s->root_depth);
 }
 
-int main(int argc, char** argv)
+struct {
+    int16_t x, y;
+    uint16_t w, h;
+
+    xcb_connection_t* con;
+    xcb_window_t wi;
+    xcb_gcontext_t gc;
+    xcb_screen_t* sc;
+    xcb_key_symbols_t* syms;
+} state;
+
+void x11_init(void)
 {
     int s;
-    xcb_connection_t* con = xcb_connect(NULL, &s);
-    int r = xcb_connection_has_error(con);
+    state.con = xcb_connect(NULL, &s);
+    int r = xcb_connection_has_error(state.con);
     if(r != 0) { failwith("xcb_connection_has_error(...) == %d", r); }
 
-    xcb_screen_t* sc = fetch_screen(con, s);
-    dump_screen_info(sc);
+    state.sc = fetch_screen(state.con, s);
+    dump_screen_info(state.sc, s);
 
-    xcb_window_t wi = xcb_generate_id(con);
-
+    // create window
+    state.wi = xcb_generate_id(state.con);
+    state.x = 0; state.y = 0;
+    state.w = 800; state.h = 600;
     xcb_void_cookie_t c = xcb_create_window_checked(
-        con, XCB_COPY_FROM_PARENT,
-        wi, sc->root,
-        /* x, y */ 0, 0,
-        /* w, h */ 150, 150,
-        /* border */ 1,
+        state.con, XCB_COPY_FROM_PARENT,
+        state.wi, state.sc->root,
+        state.x, state.y,
+        state.w, state.h,
+        /* border */ 0,
         XCB_WINDOW_CLASS_INPUT_OUTPUT,
-        sc->root_visual,
-        XCB_CW_EVENT_MASK,
-        &(int[]){ XCB_EVENT_MASK_KEY_PRESS });
-    xcb_generic_error_t* err = xcb_request_check(con, c);
+        state.sc->root_visual,
+        XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK,
+        &(int[]){
+            0x0000ff,
+            XCB_EVENT_MASK_KEY_PRESS
+                | XCB_EVENT_MASK_STRUCTURE_NOTIFY
+                | XCB_EVENT_MASK_EXPOSURE
+        });
+    xcb_generic_error_t* err = xcb_request_check(state.con, c);
     if(err) {
         failwith("xcb_create_window_checked failed: %u", err->error_code);
     }
 
-    c = xcb_map_window_checked(con, wi);
-    if((err = xcb_request_check(con, c))) {
-        failwith("xcb_map_window_checked failed: %u", err->error_code);
-    }
-
-    xcb_gcontext_t gc = xcb_generate_id(con);
-    c = xcb_create_gc_checked(con, gc, sc->root, 0, NULL);
-    if((err = xcb_request_check(con, c))) {
+    // gc
+    state.gc = xcb_generate_id(state.con);
+    c = xcb_create_gc_checked(
+        state.con, state.gc, state.sc->root,
+        XCB_GC_BACKGROUND | XCB_GC_GRAPHICS_EXPOSURES, &(int[]){ 0x00aaee,  1 });
+    if((err = xcb_request_check(state.con, c))) {
         failwith("xcb_create_gc_checked failed: %u", err->error_code);
     }
 
-    xcb_key_symbols_t* syms = xcb_key_symbols_alloc(con);
+    // syms
+    state.syms = xcb_key_symbols_alloc(state.con);
 
-    if((r = xcb_flush(con)) <= 0) { failwith("xcb_flush(...) == %d", r); }
+    // map window
+    c = xcb_map_window_checked(state.con, state.wi);
+    if((err = xcb_request_check(state.con, c))) {
+        failwith("xcb_map_window_checked failed: %u", err->error_code);
+    }
+}
 
+void x11_deinit(void)
+{
+    xcb_key_symbols_free(state.syms);
+    xcb_disconnect(state.con);
+}
+
+void render(void)
+{
+    uint32_t buf[state.w * state.h];
+    for(size_t i = 0; i < LENGTH(buf); i++) {
+        buf[i] = i;
+    }
+
+    xcb_void_cookie_t c = xcb_put_image_checked(
+        state.con, XCB_IMAGE_FORMAT_Z_PIXMAP,
+        state.wi, state.gc,
+        state.w, state.h,
+        /* x */ 0, /* y */ 0,
+        0, state.sc->root_depth,
+        sizeof(buf), (uint8_t*)buf);
+    xcb_generic_error_t* err = xcb_request_check(state.con, c);
+    if(err) {
+        failwith("xcb_put_image_checked failed: %u", err->error_code);
+    }
+}
+
+
+void flush(void)
+{
+    int r = xcb_flush(state.con);
+    if(r <= 0) { failwith("xcb_flush(...) == %d", r); }
+}
+
+void run_event_loop(void)
+{
+    // event loop
     xcb_generic_event_t* e; int bail = 0;
-    while(!bail && (e = xcb_wait_for_event(con))) {
+    while(!bail && (e = xcb_wait_for_event(state.con))) {
         switch(e->response_type & ~0x80) {
         case XCB_KEY_PRESS: {
             xcb_key_press_event_t* ev = (xcb_key_press_event_t*)e;
-            xcb_keysym_t sym = xcb_key_symbols_get_keysym(syms, ev->detail, 0);
+            xcb_keysym_t sym = xcb_key_symbols_get_keysym(state.syms,
+                                                          ev->detail, 0);
             switch(sym) {
             case XK_q:
             case XK_Q:
@@ -80,14 +142,47 @@ int main(int argc, char** argv)
             }
             break;
         }
+        case XCB_CONFIGURE_NOTIFY: {
+            xcb_configure_notify_event_t* ev = (xcb_configure_notify_event_t*)e;
+            state.w = ev->width; state.h = ev->height;
+            state.x = ev->x; state.y = ev->y;
+            info("geometry: %" PRIi16 "x%" PRIi16 "+%" PRIu16 "+%" PRIu16,
+                 state.w, state.h, state.x, state.y);
+
+            render();
+
+            break;
+        }
+        case XCB_EXPOSE: {
+            xcb_expose_event_t* ev = (xcb_expose_event_t*)e;
+            info("expose (count=%" PRIu16 "): %" PRIu16 "x%" PRIu16
+                 "+%" PRIu16 "+%" PRIu16,
+                 ev->count, ev->width, ev->height, ev->x, ev->y);
+
+            render();
+        }
+        case XCB_MAP_NOTIFY: {
+            xcb_map_notify_event_t* ev = (xcb_map_notify_event_t*)e;
+            info("mapped: override_redirect=%" PRIu8, ev->override_redirect);
+            break;
+        }
+        case XCB_UNMAP_NOTIFY: {
+            xcb_unmap_notify_event_t* ev = (xcb_unmap_notify_event_t*)e;
+            info("unmapped: from_configure=%" PRIu8, ev->from_configure);
+            break;
+        }
         default:
             failwith("unexpected event: response_type=%u", e->response_type);
         }
 
         free(e);
     }
+}
 
-    xcb_key_symbols_free(syms);
-    xcb_disconnect(con);
+int main(int argc, char** argv)
+{
+    x11_init();
+    run_event_loop();
+    x11_deinit();
     return 0;
 }

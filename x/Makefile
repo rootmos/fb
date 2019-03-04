@@ -16,7 +16,7 @@ run: main
 gdb: main
 	gdb $<
 
-main: main.o
+main: main.o rt.o
 	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
 %.o: %.c

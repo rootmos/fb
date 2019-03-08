@@ -171,6 +171,7 @@ void rt_setup(void)
 
     static sphere_t ss[] = {
         { .c = vec(10, 0, 0), .r = 5 },
+        { .c = vec(10, 7, 0), .r = 2 },
     };
     world.spheres = ss;
     world.spheres_len = LENGTH(ss);
@@ -186,21 +187,19 @@ void rt_draw(color_t buf[], size_t height, size_t width)
                   l.p.x, l.p.y, l.p.z,
                   l.b.x, l.b.y, l.b.z);
 
+            color_t c = black;
             for(size_t n = 0; n < world.spheres_len; n++) {
                 float t[2];
                 int r = intersect_line_sphere(l, world.spheres[n], t);
-                if(r == 0) {
-                    buf[i*width + j] = black;
-                } else if (r == 1) {
+                if (r == 1) {
                     not_implemented();
-                } else {
+                } else if(r == 2) {
                     if(t[0] > 0 && t[1] > 0) {
-                        buf[i*width + j] = green;
-                    } else {
-                        buf[i*width + j] = red;
+                        c = green;
                     }
                 }
             }
+            buf[i*width + j] = c;
         }
     }
 }

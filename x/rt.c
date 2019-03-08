@@ -35,27 +35,27 @@ typedef struct {
     float r;
 } sphere_t;
 
-vec_t add(vec_t v, vec_t w)
+static inline vec_t add(vec_t v, vec_t w)
 {
     return (vec_t){ .x = v.x + w.x, .y = v.y + w.y, .z = v.z + w.z };
 }
 
-vec_t sub(vec_t v, vec_t w)
+static inline vec_t sub(vec_t v, vec_t w)
 {
     return (vec_t){ .x = v.x - w.x, .y = v.y - w.y, .z = v.z - w.z };
 }
 
-float dot(vec_t v, vec_t w)
+static inline float dot(vec_t v, vec_t w)
 {
     return v.x*w.x + v.y*w.y + v.z*w.z;
 }
 
-vec_t scalar_prod(float t, vec_t v)
+static inline vec_t scalar_prod(float t, vec_t v)
 {
     return (vec_t){ .x = t * v.x, .y = t * v.y, .z = t * v.z};
 }
 
-line_t line_from_two_points(vec_t v, vec_t w)
+static inline line_t line_from_two_points(vec_t v, vec_t w)
 {
     return (line_t){ .p = v, .b = sub(w, v) };
 }
@@ -65,7 +65,7 @@ vec_t project_point_on_line(line_t l, vec_t v)
     return add(l.p, scalar_prod(dot(l.b, sub(v, l.p))/dot(l.b, l.b), l.b));
 }
 
-vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
+static vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
 {
     for(size_t i = 0; i < dim; i++) {
         origin = add(origin, scalar_prod(t[i], base[i]));
@@ -73,12 +73,12 @@ vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
     return origin;
 }
 
-vec_t line_coord(line_t l, float t)
+static inline vec_t line_coord(line_t l, float t)
 {
     return coordinates(l.p, &l.b, &t, 1);
 }
 
-vec_t grid_coord(grid_t g, float t[])
+static inline vec_t grid_coord(grid_t g, float t[])
 {
     return coordinates(g.p, g.b, t, 2);
 }
@@ -86,7 +86,7 @@ vec_t grid_coord(grid_t g, float t[])
 #define eqf(a,b) (fabsf(a - b) < 1e-8)
 
 // at^2 + bt + c = 0
-int solve_2nd_order(float a, float b, float c, float t[])
+static int solve_2nd_order(float a, float b, float c, float t[])
 {
     if(eqf(a, 0)) {
         t[0] = -c/b;
@@ -104,7 +104,7 @@ int solve_2nd_order(float a, float b, float c, float t[])
     return 2;
 }
 
-void solve_2nd_order_tests(void)
+static void solve_2nd_order_tests(void)
 {
     float t[2];
     int r = solve_2nd_order(1, 0, -4, t);
@@ -117,7 +117,7 @@ void solve_2nd_order_tests(void)
 }
 
 
-int intersect_line_sphere(line_t l, sphere_t s, float t[])
+inline static int intersect_line_sphere(line_t l, sphere_t s, float t[])
 {
     const vec_t d = sub(l.p, s.c);
     return solve_2nd_order(
@@ -128,7 +128,7 @@ int intersect_line_sphere(line_t l, sphere_t s, float t[])
     );
 }
 
-void intersect_line_sphere_tests(void)
+static void intersect_line_sphere_tests(void)
 {
     line_t l = { .p = vec(-3, 0, 0), .b = vec(1, 0, 0) };
     sphere_t s = { .c = vec(10, 0, 0), .r = 5 };

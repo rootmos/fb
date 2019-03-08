@@ -1,7 +1,7 @@
 BUILD ?= ../build
 CFLAGS = -Wall -Werror -I$(BUILD)/include
 LDFLAGS = -L$(BUILD)/lib
-EXTRA_CFLAGS ?= -O1 -g -DLOG_LEVEL=4
+EXTRA_CFLAGS ?= -O2 -DLOG_LEVEL=2
 EXTRA_LDFLAGS ?=
 
 CC = gcc

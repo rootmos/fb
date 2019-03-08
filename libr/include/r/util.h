@@ -2,7 +2,6 @@
 
 #define LENGTH(xs) (sizeof(xs)/sizeof((xs)[0]))
 
-
 #define CHECK(res, format, ...) CHECK_NOT(res, -1, format, ##__VA_ARGS__)
 
 #define CHECK_NOT(res, err, format, ...) \
@@ -26,10 +25,53 @@
 } while(0)
 #endif
 
-#define info(format, ...) do { \
-    __info(__extension__ __FUNCTION__, __extension__ __FILE__, \
+#define LOG_QUIET 0
+#define LOG_ERROR 1
+#define LOG_WARNING 2
+#define LOG_INFO 3
+#define LOG_DEBUG 4
+#define LOG_TRACE 5
+
+#ifndef LOG_LEVEL
+#define LOG_LEVEL LOG_INFO
+#endif
+
+#define log(level, format, ...) do { \
+    __log(level, __extension__ __FUNCTION__, __extension__ __FILE__, \
            __extension__ __LINE__, format "\n", ##__VA_ARGS__); \
 } while(0)
+
+void __dummy();
+
+#if LOG_LEVEL >= LOG_ERROR
+#define error(format, ...) log(LOG_ERROR, format, ##__VA_ARGS__)
+#else
+#define error(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#endif
+
+#if LOG_LEVEL >= LOG_WARNING
+#define warning(format, ...) log(LOG_WARNING, format, ##__VA_ARGS__)
+#else
+#define warning(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#endif
+
+#if LOG_LEVEL >= LOG_INFO
+#define info(format, ...) log(LOG_INFO, format, ##__VA_ARGS__)
+#else
+#define info(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#endif
+
+#if LOG_LEVEL >= LOG_DEBUG
+#define debug(format, ...) log(LOG_DEBUG, format, ##__VA_ARGS__)
+#else
+#define debug(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#endif
+
+#if LOG_LEVEL >= LOG_TRACE
+#define trace(format, ...) log(LOG_TRACE, format, ##__VA_ARGS__)
+#else
+#define trace(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#endif
 
 #define failwith(format, ...) \
     __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
@@ -44,11 +86,12 @@ void __failwith(const char* const caller,
                 const char* const fmt, ...)
     __attribute__ ((noreturn, format (printf, 5, 6)));
 
-void __info(const char* const caller,
-            const char* const file,
-            const unsigned int line,
-            const char* const fmt, ...)
-    __attribute__ ((format (printf, 4, 5)));
+void __log(int level,
+           const char* const caller,
+           const char* const file,
+           const unsigned int line,
+           const char* const fmt, ...)
+    __attribute__ ((format (printf, 5, 6)));
 
 const char* getenv_mandatory(const char* const env);
 

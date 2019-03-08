@@ -1,7 +1,7 @@
 BUILD ?= ../build
 CFLAGS = -Wall -Werror -I$(BUILD)/include
 LDFLAGS = -L$(BUILD)/lib
-EXTRA_CFLAGS ?= -O1 -g
+EXTRA_CFLAGS ?= -O1 -g -DLOG_LEVEL=4
 EXTRA_LDFLAGS ?=
 
 CC = gcc
@@ -11,7 +11,7 @@ LIBS = -lxcb -lxcb-keysyms -l:libr.a
 SRC = $(shell git ls-files)
 
 run: main
-	timeout 0.5 ./$<
+	timeout 10 ./$<
 
 gdb: main
 	gdb $<

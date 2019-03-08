@@ -1,6 +1,11 @@
+#include <r.h>
+#include "rt.h"
+
 typedef struct {
     float x, y, z;
 } vec_t;
+
+#define vec(x, y, z) ((vec_t){ x, y, z })
 
 // p + span(b)
 typedef struct {
@@ -56,6 +61,24 @@ vec_t project_point_on_line(line_t l, vec_t v)
     return add(l.p, scalar_prod(dot(l.b, sub(v, l.p))/dot(l.b, l.b), l.b));
 }
 
+vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
+{
+    for(size_t i = 0; i < dim; i++) {
+        origin = add(origin, scalar_prod(t[i], base[i]));
+    }
+    return origin;
+}
+
+vec_t line_coord(line_t l, float t)
+{
+    return coordinates(l.p, &l.b, &t, 1);
+}
+
+vec_t grid_coord(grid_t g, float t[])
+{
+    return coordinates(g.p, g.b, t, 2);
+}
+
 // at^2 + bt + c = 0
 int solve_2nd_order(float a, float b, float c, float t[])
 {
@@ -68,17 +91,70 @@ int solve_2nd_order(float a, float b, float c, float t[])
     return 2;
 }
 
-int intersect_line_sphere(line_t l, sphere_t s, vec_t v[])
+int intersect_line_sphere(line_t l, sphere_t s, float t[])
 {
-    float t[2];
-    const int i = solve_2nd_order(
+    return solve_2nd_order(
         dot(l.b, l.b),
         -2*dot(l.b, s.c),
         dot(sub(l.p, s.c), sub(l.p, s.c)) - s.r*s.r,
         t
     );
-    for(int j = i; j < i; j++) {
-        v[j] = add(l.p, scalar_prod(t[j], l.b));
+}
+
+typedef struct {
+    vec_t camera;
+    grid_t plane;
+} viewport_t;
+
+typedef struct {
+    sphere_t* spheres;
+    size_t spheres_len;
+} world_t;
+
+#define black ((color_t){ 0 })
+#define white ((color_t){ 0xff })
+
+static viewport_t view;
+static world_t world;
+
+void rt_setup(void)
+{
+    view.camera = vec(-10.0, 0, 0);
+    view.plane.p = vec(0, 0, 0);
+    view.plane.b[0] = vec(0, 0.1, 0);
+    view.plane.b[1] = vec(0, 0, 0.1);
+
+    static sphere_t ss[] = {
+        { .c = vec(20, 0, 0), .r = 5 },
+    };
+    world.spheres = ss;
+    world.spheres_len = LENGTH(ss);
+}
+
+void rt_draw(color_t buf[], size_t height, size_t width)
+{
+    for(size_t i = 0; i < height; i++) {
+        for(size_t j = 0; j < width; j++) {
+            vec_t p = grid_coord(view.plane, (float[]){ i - (height/2), j - (width/2) });
+            line_t l = line_from_two_points(view.camera, p);
+            trace("checking line: p=(%f,%f,%f) b=(%f,%f,%f)",
+                  l.p.x, l.p.y, l.p.z,
+                  l.b.x, l.b.y, l.b.z);
+
+            for(size_t n = 0; n < world.spheres_len; n++) {
+                float t[2];
+                int r = intersect_line_sphere(l, world.spheres[n], t);
+                if(r == 0) {
+                    buf[i*width + j] = black;
+                } else {
+                    debug("drawing sphere %zu, %d intersections", n, r);
+                    if(t[0] > 0 || t[1] > 0) {
+                        buf[i*width + j] = white;
+                    } else {
+                        buf[i*width + j] = black;
+                    }
+                }
+            }
+        }
     }
-    return i;
 }

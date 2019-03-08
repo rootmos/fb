@@ -6,6 +6,7 @@
 #include <X11/keysym.h>
 
 #include <r.h>
+#include "rt.h"
 
 static xcb_screen_t* fetch_screen(xcb_connection_t* con, int screen)
 {
@@ -49,7 +50,7 @@ void x11_init(void)
     // create window
     state.wi = xcb_generate_id(state.con);
     state.x = 0; state.y = 0;
-    state.w = 800; state.h = 600;
+    state.w = 100; state.h = 100;
     xcb_void_cookie_t c = xcb_create_window_checked(
         state.con, XCB_COPY_FROM_PARENT,
         state.wi, state.sc->root,
@@ -98,9 +99,7 @@ void x11_deinit(void)
 void render(void)
 {
     uint32_t buf[state.w * state.h];
-    for(size_t i = 0; i < LENGTH(buf); i++) {
-        buf[i] = i;
-    }
+    rt_draw((color_t*)buf, state.h, state.w);
 
     xcb_void_cookie_t c = xcb_put_image_checked(
         state.con, XCB_IMAGE_FORMAT_Z_PIXMAP,
@@ -138,7 +137,7 @@ void run_event_loop(void)
                 bail = 1;
                 break;
             default:
-                info("unmapped key press: %x", sym);
+                debug("unmapped key press: %x", sym);
             }
             break;
         }
@@ -155,20 +154,20 @@ void run_event_loop(void)
         }
         case XCB_EXPOSE: {
             xcb_expose_event_t* ev = (xcb_expose_event_t*)e;
-            info("expose (count=%" PRIu16 "): %" PRIu16 "x%" PRIu16
+            debug("expose (count=%" PRIu16 "): %" PRIu16 "x%" PRIu16
                  "+%" PRIu16 "+%" PRIu16,
                  ev->count, ev->width, ev->height, ev->x, ev->y);
-
             render();
         }
         case XCB_MAP_NOTIFY: {
             xcb_map_notify_event_t* ev = (xcb_map_notify_event_t*)e;
-            info("mapped: override_redirect=%" PRIu8, ev->override_redirect);
+            debug("mapped: override_redirect=%" PRIu8,
+                  ev->override_redirect);
             break;
         }
         case XCB_UNMAP_NOTIFY: {
             xcb_unmap_notify_event_t* ev = (xcb_unmap_notify_event_t*)e;
-            info("unmapped: from_configure=%" PRIu8, ev->from_configure);
+            debug("unmapped: from_configure=%" PRIu8, ev->from_configure);
             break;
         }
         default:
@@ -181,6 +180,7 @@ void run_event_loop(void)
 
 int main(int argc, char** argv)
 {
+    rt_setup();
     x11_init();
     run_event_loop();
     x11_deinit();

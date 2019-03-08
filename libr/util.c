@@ -9,6 +9,11 @@
 #include <time.h>
 #include <unistd.h>
 
+void __dummy()
+{
+    failwith("called the dummy function, you dummy!");
+}
+
 const char* now_iso8601(void)
 {
     static char buf[17];
@@ -26,10 +31,11 @@ static void log_prefix(const char* const caller,
             now_iso8601(), getpid(), caller, file, line);
 }
 
-void __info(const char* const caller,
-            const char* const file,
-            const unsigned int line,
-            const char* const fmt, ...)
+void __log(int level,
+           const char* const caller,
+           const char* const file,
+           const unsigned int line,
+           const char* const fmt, ...)
 {
     log_prefix(caller, file, line);
 

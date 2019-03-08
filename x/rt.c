@@ -2,10 +2,10 @@ typedef struct {
     float x, y, z;
 } vec_t;
 
-// p + span(n)
+// p + span(b)
 typedef struct {
     vec_t p;
-    vec_t n;
+    vec_t b;
 } line_t;
 
 // forall v: (v - p) . n = 0
@@ -48,12 +48,12 @@ vec_t scalar_prod(float t, vec_t v)
 
 line_t line_from_two_points(vec_t v, vec_t w)
 {
-    return (line_t){ .p = v, .n = sub(w, v) };
+    return (line_t){ .p = v, .b = sub(w, v) };
 }
 
 vec_t project_point_on_line(line_t l, vec_t v)
 {
-    return add(l.p, scalar_prod(dot(l.n, sub(v, l.p))/dot(l.n, l.n), l.n));
+    return add(l.p, scalar_prod(dot(l.b, sub(v, l.p))/dot(l.b, l.b), l.b));
 }
 
 // at^2 + bt + c = 0
@@ -72,13 +72,13 @@ int intersect_line_sphere(line_t l, sphere_t s, vec_t v[])
 {
     float t[2];
     const int i = solve_2nd_order(
-        dot(l.n, l.n),
-        -2*dot(l.n, s.c),
+        dot(l.b, l.b),
+        -2*dot(l.b, s.c),
         dot(sub(l.p, s.c), sub(l.p, s.c)) - s.r*s.r,
         t
     );
     for(int j = i; j < i; j++) {
-        v[j] = add(l.p, scalar_prod(t[j], l.n));
+        v[j] = add(l.p, scalar_prod(t[j], l.b));
     }
     return i;
 }

@@ -7,7 +7,7 @@ EXTRA_LDFLAGS ?=
 CC = gcc
 LD = $(CC)
 
-LIBS = -lxcb -lxcb-keysyms -l:libr.a
+LIBS = -lxcb -lxcb-keysyms -l:libr.a -lm
 SRC = $(shell git ls-files)
 
 run: main

@@ -9,7 +9,7 @@
 
 #define CHECK_IF(cond, format, ...) do { \
     if(cond) { \
-        __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
+        r_failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
                    __extension__ __LINE__, 1, \
                    format "\n", ##__VA_ARGS__); \
     } \
@@ -18,7 +18,7 @@
 #ifdef SND_LIB_VERSION
 #define CHECK_ALSA(err, format, ...) do { \
     if(err < 0) { \
-        __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
+        r_failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
                    __extension__ __LINE__, 0, \
                    format ": %s\n", ##__VA_ARGS__, snd_strerror(err)); \
     } \
@@ -36,57 +36,57 @@
 #define LOG_LEVEL LOG_INFO
 #endif
 
-#define log(level, format, ...) do { \
-    __log(level, __extension__ __FUNCTION__, __extension__ __FILE__, \
-           __extension__ __LINE__, format "\n", ##__VA_ARGS__); \
+#define logging(level, format, ...) do { \
+    r_log(level, __extension__ __FUNCTION__, __extension__ __FILE__, \
+          __extension__ __LINE__, format "\n", ##__VA_ARGS__); \
 } while(0)
 
-void __dummy();
+void r_dummy();
 
 #if LOG_LEVEL >= LOG_ERROR
-#define error(format, ...) log(LOG_ERROR, format, ##__VA_ARGS__)
+#define error(format, ...) logging(LOG_ERROR, format, ##__VA_ARGS__)
 #else
-#define error(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#define error(format, ...) do { if(0) r_dummy(__VA_ARGS__); } while(0)
 #endif
 
 #if LOG_LEVEL >= LOG_WARNING
-#define warning(format, ...) log(LOG_WARNING, format, ##__VA_ARGS__)
+#define warning(format, ...) logging(LOG_WARNING, format, ##__VA_ARGS__)
 #else
-#define warning(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#define warning(format, ...) do { if(0) r_dummy(__VA_ARGS__); } while(0)
 #endif
 
 #if LOG_LEVEL >= LOG_INFO
-#define info(format, ...) log(LOG_INFO, format, ##__VA_ARGS__)
+#define info(format, ...) logging(LOG_INFO, format, ##__VA_ARGS__)
 #else
-#define info(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#define info(format, ...) do { if(0) r_dummy(__VA_ARGS__); } while(0)
 #endif
 
 #if LOG_LEVEL >= LOG_DEBUG
-#define debug(format, ...) log(LOG_DEBUG, format, ##__VA_ARGS__)
+#define debug(format, ...) logging(LOG_DEBUG, format, ##__VA_ARGS__)
 #else
-#define debug(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#define debug(format, ...) do { if(0) r_dummy(__VA_ARGS__); } while(0)
 #endif
 
 #if LOG_LEVEL >= LOG_TRACE
-#define trace(format, ...) log(LOG_TRACE, format, ##__VA_ARGS__)
+#define trace(format, ...) logging(LOG_TRACE, format, ##__VA_ARGS__)
 #else
-#define trace(format, ...) do { if(0) __dummy(__VA_ARGS__); } while(0)
+#define trace(format, ...) do { if(0) r_dummy(__VA_ARGS__); } while(0)
 #endif
 
 #define failwith(format, ...) \
-    __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
+    r_failwith(__extension__ __FUNCTION__, __extension__ __FILE__, \
                __extension__ __LINE__, 0, format "\n", ##__VA_ARGS__)
 
 #define not_implemented() failwith("not implemented")
 
-void __failwith(const char* const caller,
+void r_failwith(const char* const caller,
                 const char* const file,
                 const unsigned int line,
                 const int include_errno,
                 const char* const fmt, ...)
     __attribute__ ((noreturn, format (printf, 5, 6)));
 
-void __log(int level,
+void r_log(int level,
            const char* const caller,
            const char* const file,
            const unsigned int line,

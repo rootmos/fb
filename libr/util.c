@@ -9,7 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 
-void __dummy()
+void r_dummy()
 {
     failwith("called the dummy function, you dummy!");
 }
@@ -31,7 +31,7 @@ static void log_prefix(const char* const caller,
             now_iso8601(), getpid(), caller, file, line);
 }
 
-void __log(int level,
+void r_log(int level,
            const char* const caller,
            const char* const file,
            const unsigned int line,
@@ -45,7 +45,7 @@ void __log(int level,
     va_end(vl);
 }
 
-void __failwith(const char* const caller,
+void r_failwith(const char* const caller,
                 const char* const file,
                 const unsigned int line,
                 const int include_errno,

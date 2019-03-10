@@ -1,8 +1,17 @@
 BUILD ?= ../build
 CFLAGS = -Wall -Werror -I$(BUILD)/include
 LDFLAGS = -L$(BUILD)/lib
-EXTRA_CFLAGS ?= -O2 -DLOG_LEVEL=2
+LOG_LEVEL ?= 3
+
+EXTRA_CFLAGS ?= -O3 -DLOG_LEVEL=$(LOG_LEVEL)
 EXTRA_LDFLAGS ?=
+
+ifdef PROFILE
+EXTRA_CFLAGS += -pg
+EXTRA_LDFLAGS += -pg
+endif
+
+TIMEOUT ?= 1
 
 CC = gcc
 LD = $(CC)
@@ -11,10 +20,14 @@ LIBS = -lxcb -lxcb-keysyms -l:libr.a -lm
 SRC = $(shell git ls-files)
 
 run: main
-	timeout 10 ./$<
+	timeout --preserve-status $(TIMEOUT) ./$<
 
 gdb: main
 	gdb $<
+
+profile:
+	$(MAKE) clean run PROFILE=1
+	gprof main gmon.out | head -n10
 
 main: main.o rt.o
 	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
@@ -25,4 +38,4 @@ main: main.o rt.o
 clean:
 	rm -f *.o main
 
-.PHONY: run clean gdb
+.PHONY: run clean gdb profile

@@ -50,9 +50,19 @@ static inline float dot(vec_t v, vec_t w)
     return v.x*w.x + v.y*w.y + v.z*w.z;
 }
 
+static inline float norm_sq(vec_t v)
+{
+    return v.x*v.x + v.y*v.y + v.z*v.z;
+}
+
 static inline vec_t scalar_prod(float t, vec_t v)
 {
     return (vec_t){ .x = t * v.x, .y = t * v.y, .z = t * v.z};
+}
+
+static inline vec_t normalize(vec_t v)
+{
+    return scalar_prod(1/sqrtf(norm_sq(v)), v);
 }
 
 static inline line_t line_from_two_points(vec_t v, vec_t w)
@@ -60,12 +70,12 @@ static inline line_t line_from_two_points(vec_t v, vec_t w)
     return (line_t){ .p = v, .b = sub(w, v) };
 }
 
-vec_t project_point_on_line(line_t l, vec_t v)
+static inline vec_t project_point_on_line(line_t l, vec_t v)
 {
     return add(l.p, scalar_prod(dot(l.b, sub(v, l.p))/dot(l.b, l.b), l.b));
 }
 
-static vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
+static inline vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
 {
     for(size_t i = 0; i < dim; i++) {
         origin = add(origin, scalar_prod(t[i], base[i]));
@@ -73,14 +83,13 @@ static vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
     return origin;
 }
 
-static inline vec_t line_coord(line_t l, float t)
+static inline vec_t grid_coord(grid_t g, float s, float t)
 {
-    return coordinates(l.p, &l.b, &t, 1);
-}
-
-static inline vec_t grid_coord(grid_t g, float t[])
-{
-    return coordinates(g.p, g.b, t, 2);
+    return vec(
+        g.p.x + s*g.b[0].x + t*g.b[1].x,
+        g.p.y + s*g.b[0].y + t*g.b[1].y,
+        g.p.z + s*g.b[0].z + t*g.b[1].z
+    );
 }
 
 #define eqf(a,b) (fabsf(a - b) < 1e-8)
@@ -96,9 +105,8 @@ static int solve_2nd_order(float a, float b, float c, float t[])
     float d = b*b - 4*a*c;
     if(d < 0) return 0;
 
-    const float p = -b/(2*a);
-    d = sqrt(d);
-    d /= (2*a);
+    const float p = b/(-2*a);
+    d = sqrtf(d) / (2*a);
     t[0] = p + d;
     t[1] = p - d;
     return 2;
@@ -116,25 +124,31 @@ static void solve_2nd_order_tests(void)
     assert(r == 0);
 }
 
+int intersect_line_sphere(line_t l, sphere_t s)
+{
+    const vec_t a = sub(s.c, l.p);
+    const vec_t b = l.b; // normalized
+    return s.r*s.r > norm_sq(a) - (dot(a, b)*dot(a, b));
+}
 
-inline static int intersect_line_sphere(line_t l, sphere_t s, float t[])
+inline static int intersect_line_sphere_points(line_t l, sphere_t s, float t[])
 {
     const vec_t d = sub(l.p, s.c);
     return solve_2nd_order(
-        dot(l.b, l.b),
+        norm_sq(l.b),
         2*dot(l.b, d),
-        dot(d, d) - s.r*s.r,
+        norm_sq(d) - s.r*s.r,
         t
     );
 }
 
-static void intersect_line_sphere_tests(void)
+static void intersect_line_sphere_points_tests(void)
 {
     line_t l = { .p = vec(-3, 0, 0), .b = vec(1, 0, 0) };
     sphere_t s = { .c = vec(10, 0, 0), .r = 5 };
 
     float t[2];
-    int r = intersect_line_sphere(l, s, t);
+    int r = intersect_line_sphere_points(l, s, t);
     assert(r == 2);
     assert(eqf(t[0], 18));
     assert(eqf(t[1], 8));
@@ -162,12 +176,12 @@ static world_t world;
 void rt_setup(void)
 {
     solve_2nd_order_tests();
-    intersect_line_sphere_tests();
+    intersect_line_sphere_points_tests();
 
     view.camera = vec(-10.0, 0, 0);
     view.plane.p = vec(0, 0, 0);
-    view.plane.b[0] = vec(0, 0.1, 0);
-    view.plane.b[1] = vec(0, 0, 0.1);
+    view.plane.b[0] = vec(0, 0.01, 0);
+    view.plane.b[1] = vec(0, 0, 0.01);
 
     static sphere_t ss[] = {
         { .c = vec(10, 0, 0), .r = 5 },
@@ -177,12 +191,13 @@ void rt_setup(void)
     world.spheres_len = LENGTH(ss);
 }
 
-void rt_draw(color_t buf[], size_t height, size_t width)
+void rt_draw(color_t buf[], const size_t height, const size_t width)
 {
     for(size_t i = 0; i < height; i++) {
         for(size_t j = 0; j < width; j++) {
-            vec_t p = grid_coord(view.plane, (float[]){ (float)i - (height/2), (float)j - (width/2) });
+            vec_t p = grid_coord(view.plane, (float)j - width/2, (float)i -height/2);
             line_t l = line_from_two_points(view.camera, p);
+
             trace("checking line: p=(%f,%f,%f) b=(%f,%f,%f)",
                   l.p.x, l.p.y, l.p.z,
                   l.b.x, l.b.y, l.b.z);
@@ -190,7 +205,7 @@ void rt_draw(color_t buf[], size_t height, size_t width)
             color_t c = black;
             for(size_t n = 0; n < world.spheres_len; n++) {
                 float t[2];
-                int r = intersect_line_sphere(l, world.spheres[n], t);
+                int r = intersect_line_sphere_points(l, world.spheres[n], t);
                 if (r == 1) {
                     not_implemented();
                 } else if(r == 2) {

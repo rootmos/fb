@@ -3,7 +3,6 @@
 #include "renderer.h"
 #include "demo.h"
 #include "fb.h"
-#include "mark.h"
 
 #include <sys/prctl.h>
 #include <sys/eventfd.h>

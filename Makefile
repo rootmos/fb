@@ -24,7 +24,7 @@ DEPLOY_HOST=pi@192.168.1.166
 DEPLOY_TARGET=$(DEPLOY_HOST):demo
 DEPLOY_LOCAL_EXECUTABLE=./demo
 
-demo: main.o demo.o renderer.o fb.o mark.o
+demo: main.o demo.o renderer.o fb.o
 	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
 ametro: ametro.c

@@ -1,5 +1,6 @@
-#include <r.h>
-#include "mark.h"
+#include "r/mark.h"
+#include "r/fail.h"
+#include "r/logging.h"
 
 #include <assert.h>
 #include <time.h>
@@ -36,6 +37,11 @@ struct mark* mark_init(const char* const what,
     mark_set(m);
 
     return m;
+}
+
+void mark_free(struct mark* const m)
+{
+    free(m);
 }
 
 void mark_tick(struct mark* const m)

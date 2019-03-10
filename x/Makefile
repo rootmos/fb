@@ -7,7 +7,7 @@ EXTRA_CFLAGS ?= -O3 -DLOG_LEVEL=$(LOG_LEVEL)
 EXTRA_LDFLAGS ?=
 
 ifdef PROFILE
-EXTRA_CFLAGS += -pg
+EXTRA_CFLAGS += -fno-inline -pg
 EXTRA_LDFLAGS += -pg
 endif
 

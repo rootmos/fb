@@ -179,6 +179,7 @@ typedef struct {
 
 static viewport_t view;
 static world_t world;
+static struct stopwatch* stopwatch;
 
 void rt_setup(void)
 {
@@ -196,10 +197,14 @@ void rt_setup(void)
     };
     world.spheres = ss;
     world.spheres_len = LENGTH(ss);
+
+    stopwatch = stopwatch_mk("rt_draw", 1);
 }
 
 void rt_draw(color_t buf[], const size_t height, const size_t width)
 {
+    stopwatch_start(stopwatch);
+
     for(size_t i = 0; i < height; i++) {
         for(size_t j = 0; j < width; j++) {
             vec_t p = grid_coord(view.plane, (float)j - width/2, (float)i -height/2);
@@ -224,4 +229,5 @@ void rt_draw(color_t buf[], const size_t height, const size_t width)
             buf[i*width + j] = c;
         }
     }
+    stopwatch_stop(stopwatch);
 }

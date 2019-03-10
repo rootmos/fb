@@ -4,3 +4,4 @@
 #include <r/logging.h>
 #include <r/fail.h>
 #include <r/mark.h>
+#include <r/stopwatch.h>

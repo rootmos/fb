@@ -138,13 +138,14 @@ int intersect_line_sphere(line_t l, sphere_t s)
     return s.r*s.r > norm_sq(a) - (dot(a, b)*dot(a, b));
 }
 
-int intersect_line_sphere_points(line_t l, sphere_t s, float t[])
+int intersect_line_sphere_points(const line_t* l, const sphere_t* s,
+                                 float t[])
 {
-    const vec_t d = sub(l.p, s.c);
+    const vec_t d = sub(l->p, s->c);
     return solve_2nd_order(
-        norm_sq(l.b),
-        2*dot(l.b, d),
-        norm_sq(d) - s.r*s.r,
+        norm_sq(l->b),
+        2*dot(l->b, d),
+        norm_sq(d) - s->r*s->r,
         t
     );
 }
@@ -155,10 +156,45 @@ void intersect_line_sphere_points_tests(void)
     sphere_t s = { .c = vec(10, 0, 0), .r = 5 };
 
     float t[2];
-    int r = intersect_line_sphere_points(l, s, t);
+    int r = intersect_line_sphere_points(&l, &s, t);
     assert(r == 2);
     assert(eqf(t[0], 18));
     assert(eqf(t[1], 8));
+}
+
+int intersect_line_plane(const line_t* l, const plane_t* p, float t[])
+{
+    not_implemented();
+}
+
+typedef struct {
+    color_t color;
+} material_t;
+
+typedef enum {
+    SHAPE_TYPE_SPHERE,
+    SHAPE_TYPE_PLANE,
+} shape_type_t;
+
+typedef struct {
+    shape_type_t shape_type;
+    union {
+        sphere_t sphere;
+        plane_t plane;
+    } shape;
+    material_t material;
+} object_t;
+
+int intersect_line_object(const line_t* l, const object_t* o, float t[])
+{
+    switch(o->shape_type) {
+    case SHAPE_TYPE_SPHERE:
+        return intersect_line_sphere_points(l, &o->shape.sphere, t);
+    case SHAPE_TYPE_PLANE:
+        return intersect_line_plane(l, &o->shape.plane, t);
+    default:
+        failwith("unsupported shape");
+    }
 }
 
 typedef struct {
@@ -167,8 +203,8 @@ typedef struct {
 } viewport_t;
 
 typedef struct {
-    sphere_t* spheres;
-    size_t spheres_len;
+    object_t* objects;
+    size_t objects_len;
 } world_t;
 
 #define black ((color_t){ 0 })
@@ -186,22 +222,30 @@ void rt_setup(void)
     solve_2nd_order_tests();
     intersect_line_sphere_points_tests();
 
-    view.camera = vec(-10.0, 0, 0);
-    view.plane.p = vec(0, 0, 0);
+    view.camera = vec(-10.0, 0, 5);
+    view.plane.p = vec(0, 0, 5);
     view.plane.b[0] = vec(0, 0.01, 0);
     view.plane.b[1] = vec(0, 0, 0.01);
 
-    static sphere_t ss[] = {
-        { .c = vec(10, 0, 0), .r = 5 },
-        { .c = vec(10, 7, 0), .r = 2 },
+    static object_t os[] = {
+        {
+            .shape_type = SHAPE_TYPE_SPHERE,
+            .shape.sphere = { .c = vec(10, 0, 5), .r = 5 },
+            .material.color = green,
+        },
+        {
+            .shape_type = SHAPE_TYPE_PLANE,
+            .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
+            .material.color = green,
+        },
     };
-    world.spheres = ss;
-    world.spheres_len = LENGTH(ss);
+    world.objects = os;
+    world.objects_len = LENGTH(os);
 
     stopwatch = stopwatch_mk("rt_draw", 1);
 }
 
-void rt_draw(color_t buf[], const size_t height, const size_t width)
+void rt_draw(color_t buf[], size_t height, size_t width)
 {
     stopwatch_start(stopwatch);
 
@@ -215,14 +259,14 @@ void rt_draw(color_t buf[], const size_t height, const size_t width)
                   l.b.x, l.b.y, l.b.z);
 
             color_t c = black;
-            for(size_t n = 0; n < world.spheres_len; n++) {
+            for(size_t n = 0; n < world.objects_len; n++) {
                 float t[2];
-                int r = intersect_line_sphere_points(l, world.spheres[n], t);
+                int r = intersect_line_object(&l, &world.objects[n], t);
                 if (r == 1) {
                     not_implemented();
                 } else if(r == 2) {
                     if(t[0] > 0 && t[1] > 0) {
-                        c = green;
+                        c = world.objects[n].material.color;
                     }
                 }
             }

@@ -173,6 +173,7 @@ int intersect_line_plane(const line_t* l, const plane_t* p, float t[])
 
 typedef struct {
     color_t color;
+    color_t light;
 } material_t;
 
 typedef enum {
@@ -211,12 +212,6 @@ typedef struct {
     size_t objects_len;
 } world_t;
 
-#define black ((color_t){ 0 })
-#define white ((color_t){ .r = 0xff, .g = 0xff, .b = 0xff })
-#define red ((color_t){ .r = 0xff, .g = 0x00, .b = 0x00 })
-#define green ((color_t){ .r = 0x00, .g = 0xff, .b = 0x00 })
-#define blue ((color_t){ .r = 0x00, .g = 0x00, .b = 0xff })
-
 static viewport_t view;
 static world_t world;
 static struct stopwatch* stopwatch;
@@ -249,7 +244,7 @@ void rt_setup(void)
     stopwatch = stopwatch_mk("rt_draw", 1);
 }
 
-object_t* find_collision(const line_t* l, const world_t* w)
+const object_t* find_collision(const line_t* l, const world_t* w, float* t)
 {
     float t_min = -1; size_t n = w->objects_len;
     for(size_t i = 0; i < w->objects_len; i++) {
@@ -257,9 +252,7 @@ object_t* find_collision(const line_t* l, const world_t* w)
         int r = intersect_line_object(l, &world.objects[i], s);
 
         for(size_t j = 0; j < r; j++) {
-            if(s[0] < 0 || s[j] < s[0]) {
-                s[0] = s[j];
-            }
+            if(s[0] < 0 || s[j] < s[0]) s[0] = s[j];
         }
 
         if(r > 0 && s[0] >= 0 && (t_min < 0 || s[0] < t_min)) {
@@ -267,7 +260,83 @@ object_t* find_collision(const line_t* l, const world_t* w)
         }
     }
 
-    return n < w->objects_len ? &w->objects[n] : NULL;
+    if(n < w->objects_len) {
+        if(t != NULL) {
+            *t = t_min;
+        }
+        return &w->objects[n];
+    } else {
+        return NULL;
+    }
+}
+
+typedef struct {
+    material_t m;
+} ray_collision_t;
+
+static ray_collision_t sky_collision(const line_t* l)
+{
+    return (ray_collision_t) { .m.light = blue };
+}
+
+color_t color_mix(color_t factor, color_t c)
+{
+    return color(c.r*factor.r/0xff, c.g*factor.g/0xff, c.b*factor.b/0xff);
+}
+
+color_t color_add(color_t x, color_t y)
+{
+    return color(x.r+y.r, x.g+y.g, x.b+y.b);
+}
+
+line_t reflect_line_sphere(const line_t* l, float t, const sphere_t* s)
+{
+    not_implemented();
+}
+
+line_t reflect_line_plane(const line_t* l, float t, const plane_t* p)
+{
+    not_implemented();
+}
+
+line_t reflect_line_object(const line_t* l, float t, const object_t* o)
+{
+    switch(o->shape_type) {
+    case SHAPE_TYPE_SPHERE:
+        return reflect_line_sphere(l, t, &o->shape.sphere);
+    case SHAPE_TYPE_PLANE:
+        return reflect_line_plane(l, t, &o->shape.plane);
+    default:
+        failwith("unsupported shape");
+    }
+}
+
+color_t ray_trace(const world_t* w, const line_t* line, size_t N)
+{
+    ray_collision_t cs[N];
+
+    line_t l = *line;
+    size_t n = 0; for(; n < N; n++) {
+        float t;
+        const object_t* o = find_collision(&l, w, &t);
+        if(!o) {
+            cs[n] = sky_collision(&l);
+            break;
+        }
+
+        l = reflect_line_object(&l, t, o);
+    }
+
+    if(n == N) {
+        return black;
+    }
+
+    color_t c = black;
+    for(ssize_t j = n; j >= 0; j--) {
+        c = color_mix(cs[n].m.color, c);
+        c = color_add(cs[n].m.light, c);
+    }
+    return c;
 }
 
 void rt_draw(color_t buf[], size_t height, size_t width)
@@ -284,10 +353,11 @@ void rt_draw(color_t buf[], size_t height, size_t width)
                   l.b.x, l.b.y, l.b.z);
 
             color_t c = black;
-            object_t* o = find_collision(&l, &world);
+            const object_t* o = find_collision(&l, &world, NULL);
             if(o) { c = o->material.color; }
             buf[i*width + j] = c;
         }
     }
+
     stopwatch_stop(stopwatch);
 }

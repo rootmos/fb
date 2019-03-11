@@ -164,7 +164,11 @@ void intersect_line_sphere_points_tests(void)
 
 int intersect_line_plane(const line_t* l, const plane_t* p, float t[])
 {
-    not_implemented();
+    const float u = dot(sub(p->p, l->p), p->n);
+    if(eqf(u, 0)) return t[0] = 0, 1; // line is in the plane
+    const float v = dot(l->b, p->n);
+    if(eqf(v, 0)) return 0; // line is parallel
+    return t[0] = u / v, 1;
 }
 
 typedef struct {
@@ -225,7 +229,7 @@ void rt_setup(void)
     view.camera = vec(-10.0, 0, 5);
     view.plane.p = vec(0, 0, 5);
     view.plane.b[0] = vec(0, 0.01, 0);
-    view.plane.b[1] = vec(0, 0, 0.01);
+    view.plane.b[1] = vec(0, 0, -0.01);
 
     static object_t os[] = {
         {
@@ -236,13 +240,34 @@ void rt_setup(void)
         {
             .shape_type = SHAPE_TYPE_PLANE,
             .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
-            .material.color = green,
+            .material.color = red,
         },
     };
     world.objects = os;
     world.objects_len = LENGTH(os);
 
     stopwatch = stopwatch_mk("rt_draw", 1);
+}
+
+object_t* find_collision(const line_t* l, const world_t* w)
+{
+    float t_min = -1; size_t n = w->objects_len;
+    for(size_t i = 0; i < w->objects_len; i++) {
+        float s[2];
+        int r = intersect_line_object(l, &world.objects[i], s);
+
+        for(size_t j = 0; j < r; j++) {
+            if(s[0] < 0 || s[j] < s[0]) {
+                s[0] = s[j];
+            }
+        }
+
+        if(r > 0 && s[0] >= 0 && (t_min < 0 || s[0] < t_min)) {
+            t_min = s[0]; n = i;
+        }
+    }
+
+    return n < w->objects_len ? &w->objects[n] : NULL;
 }
 
 void rt_draw(color_t buf[], size_t height, size_t width)
@@ -259,17 +284,8 @@ void rt_draw(color_t buf[], size_t height, size_t width)
                   l.b.x, l.b.y, l.b.z);
 
             color_t c = black;
-            for(size_t n = 0; n < world.objects_len; n++) {
-                float t[2];
-                int r = intersect_line_object(&l, &world.objects[n], t);
-                if (r == 1) {
-                    not_implemented();
-                } else if(r == 2) {
-                    if(t[0] > 0 && t[1] > 0) {
-                        c = world.objects[n].material.color;
-                    }
-                }
-            }
+            object_t* o = find_collision(&l, &world);
+            if(o) { c = o->material.color; }
             buf[i*width + j] = c;
         }
     }

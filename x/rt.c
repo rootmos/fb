@@ -41,7 +41,7 @@ vec_t add(vec_t v, vec_t w)
     return (vec_t){ .x = v.x + w.x, .y = v.y + w.y, .z = v.z + w.z };
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
 vec_t sub(vec_t v, vec_t w)
 {
     return (vec_t){ .x = v.x - w.x, .y = v.y - w.y, .z = v.z - w.z };
@@ -51,6 +51,12 @@ inline static __attribute__((always_inline))
 float dot(vec_t v, vec_t w)
 {
     return v.x*w.x + v.y*w.y + v.z*w.z;
+}
+
+inline static __attribute__((always_inline))
+vec_t cross(vec_t a, vec_t b)
+{
+    return vec(a.y*b.z - a.z*b.y, - (a.x*b.z - a.z*b.x), a.x*b.y - a.y*b.x);
 }
 
 inline static __attribute__((always_inline))
@@ -70,7 +76,7 @@ vec_t normalize(vec_t v)
     return scalar_prod(1/sqrtf(norm_sq(v)), v);
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
 line_t line_from_two_points(vec_t v, vec_t w)
 {
     return (line_t){ .p = v, .b = sub(w, v) };
@@ -89,7 +95,7 @@ vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
     return origin;
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
 vec_t grid_coord(grid_t g, float s, float t)
 {
     return vec(
@@ -97,6 +103,12 @@ vec_t grid_coord(grid_t g, float s, float t)
         g.p.y + s*g.b[0].y + t*g.b[1].y,
         g.p.z + s*g.b[0].z + t*g.b[1].z
     );
+}
+
+inline static __attribute__((always_inline))
+vec_t line_coord(line_t l, float t)
+{
+    return add(l.p, scalar_prod(t, l.b));
 }
 
 #define eqf(a,b) (fabsf(a - b) < 1e-8)
@@ -289,26 +301,35 @@ color_t color_add(color_t x, color_t y)
     return color(x.r+y.r, x.g+y.g, x.b+y.b);
 }
 
-line_t reflect_line_sphere(const line_t* l, float t, const sphere_t* s)
+vec_t rotate(float angle, vec_t axis, vec_t v)
 {
     not_implemented();
 }
 
-line_t reflect_line_plane(const line_t* l, float t, const plane_t* p)
+float angle(vec_t a, vec_t b)
 {
     not_implemented();
 }
 
-line_t reflect_line_object(const line_t* l, float t, const object_t* o)
+// pre-conditions: l->p is in the surface of o->shape
+line_t reflect_line_object(const line_t* l, const object_t* o)
 {
+    vec_t n;
     switch(o->shape_type) {
     case SHAPE_TYPE_SPHERE:
-        return reflect_line_sphere(l, t, &o->shape.sphere);
+        n = sub(l->p, o->shape.sphere.c);
+        break;
     case SHAPE_TYPE_PLANE:
-        return reflect_line_plane(l, t, &o->shape.plane);
+        n = o->shape.plane.n;
+        break;
     default:
         failwith("unsupported shape");
     }
+
+    return (line_t) {
+        .p = l->p,
+        .b = rotate(2*angle(l->b, n), cross(l->b, n), l->b)
+    };
 }
 
 color_t ray_trace(const world_t* w, const line_t* line, size_t N)
@@ -324,7 +345,13 @@ color_t ray_trace(const world_t* w, const line_t* line, size_t N)
             break;
         }
 
-        l = reflect_line_object(&l, t, o);
+        // reorient the line to originate from the collision point
+        l.p = line_coord(l, t);
+
+        l = reflect_line_object(&l, o);
+
+        // flip the line to make it point _towards_ the next potential collision
+        l.b = scalar_prod(-1, l.b);
     }
 
     if(n == N) {

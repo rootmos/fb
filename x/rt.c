@@ -41,7 +41,7 @@ vec_t add(vec_t v, vec_t w)
     return (vec_t){ .x = v.x + w.x, .y = v.y + w.y, .z = v.z + w.z };
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
 vec_t sub(vec_t v, vec_t w)
 {
     return (vec_t){ .x = v.x - w.x, .y = v.y - w.y, .z = v.z - w.z };
@@ -54,23 +54,36 @@ float dot(vec_t v, vec_t w)
 }
 
 inline static __attribute__((always_inline))
+vec_t cross(vec_t a, vec_t b)
+{
+    return vec(a.y*b.z - a.z*b.y, - (a.x*b.z - a.z*b.x), a.x*b.y - a.y*b.x);
+}
+
+inline static __attribute__((always_inline))
 float norm_sq(vec_t v)
 {
     return v.x*v.x + v.y*v.y + v.z*v.z;
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
+float norm(vec_t v)
+{
+    return sqrtf(norm_sq(v));
+}
+
+inline static __attribute__((always_inline))
 vec_t scalar_prod(float t, vec_t v)
 {
     return (vec_t){ .x = t * v.x, .y = t * v.y, .z = t * v.z};
 }
 
+inline static __attribute__((always_inline))
 vec_t normalize(vec_t v)
 {
-    return scalar_prod(1/sqrtf(norm_sq(v)), v);
+    return scalar_prod(1/norm(v), v);
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
 line_t line_from_two_points(vec_t v, vec_t w)
 {
     return (line_t){ .p = v, .b = sub(w, v) };
@@ -89,7 +102,7 @@ vec_t coordinates(vec_t origin, vec_t base[], float t[], size_t dim)
     return origin;
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
 vec_t grid_coord(grid_t g, float s, float t)
 {
     return vec(
@@ -97,6 +110,12 @@ vec_t grid_coord(grid_t g, float s, float t)
         g.p.y + s*g.b[0].y + t*g.b[1].y,
         g.p.z + s*g.b[0].z + t*g.b[1].z
     );
+}
+
+inline static __attribute__((always_inline))
+vec_t line_coord(line_t l, float t)
+{
+    return add(l.p, scalar_prod(t, l.b));
 }
 
 #define eqf(a,b) (fabsf(a - b) < 1e-8)
@@ -173,6 +192,7 @@ int intersect_line_plane(const line_t* l, const plane_t* p, float t[])
 
 typedef struct {
     color_t color;
+    color_t light;
 } material_t;
 
 typedef enum {
@@ -189,6 +209,11 @@ typedef struct {
     material_t material;
 } object_t;
 
+typedef struct {
+    object_t* objects;
+    size_t objects_len;
+} world_t;
+
 int intersect_line_object(const line_t* l, const object_t* o, float t[])
 {
     switch(o->shape_type) {
@@ -201,21 +226,140 @@ int intersect_line_object(const line_t* l, const object_t* o, float t[])
     }
 }
 
+const object_t* find_collision(const line_t* l, const world_t* w, float* t, const object_t* exclude)
+{
+    float t_min = -1; size_t n = w->objects_len;
+    for(size_t i = 0; i < w->objects_len; i++) {
+        if(&w->objects[i] == exclude) continue;
+
+        float s[2];
+        int r = intersect_line_object(l, &w->objects[i], s);
+
+        for(size_t j = 0; j < r; j++) {
+            if(s[0] < 0 || s[j] < s[0]) s[0] = s[j];
+        }
+
+        if(r > 0 && s[0] >= 0 && (t_min < 0 || s[0] < t_min)) {
+            t_min = s[0]; n = i;
+        }
+    }
+
+    if(n < w->objects_len) {
+        if(t != NULL) {
+            *t = t_min;
+        }
+        return &w->objects[n];
+    } else {
+        return NULL;
+    }
+}
+
 typedef struct {
     vec_t camera;
     grid_t plane;
 } viewport_t;
 
-typedef struct {
-    object_t* objects;
-    size_t objects_len;
-} world_t;
 
-#define black ((color_t){ 0 })
-#define white ((color_t){ .r = 0xff, .g = 0xff, .b = 0xff })
-#define red ((color_t){ .r = 0xff, .g = 0x00, .b = 0x00 })
-#define green ((color_t){ .r = 0x00, .g = 0xff, .b = 0x00 })
-#define blue ((color_t){ .r = 0x00, .g = 0x00, .b = 0xff })
+typedef struct {
+    material_t m;
+} ray_collision_t;
+
+static ray_collision_t sky_collision(const line_t* l)
+{
+    return (ray_collision_t) { .m = { .light = white, .color = black } };
+}
+
+inline static __attribute__((always_inline))
+color_t color_mix(color_t factor, color_t c)
+{
+    return color(c.r*factor.r/0xff, c.g*factor.g/0xff, c.b*factor.b/0xff);
+}
+
+inline static __attribute__((always_inline))
+color_t color_add(color_t x, color_t y)
+{
+    return color(MIN(x.r+y.r, 0xff), MIN(x.g+y.g, 0xff), MIN(x.b+y.b, 0xff));
+}
+
+inline static __attribute__((always_inline))
+float angle(vec_t a, vec_t b)
+{
+    return acosf(dot(a, b)/(norm(a)*norm(b)));
+}
+
+// pre-conditions: l->p is in the surface of o->shape
+line_t reflect_line_object(const line_t* l, const object_t* o)
+{
+    vec_t n;
+    switch(o->shape_type) {
+    case SHAPE_TYPE_SPHERE:
+        n = sub(l->p, o->shape.sphere.c);
+        break;
+    case SHAPE_TYPE_PLANE:
+        n = o->shape.plane.n;
+        break;
+    default:
+        failwith("unsupported shape");
+    }
+
+    return (line_t) {
+        .p = l->p,
+        .b = sub(scalar_prod(2*dot(l->b, n)/norm_sq(n), n), l->b)
+    };
+}
+
+void reflect_line_object_tests(void)
+{
+    line_t l = line_from_two_points(vec(0, 0, 0), vec(-1, -1, 0));
+    object_t o = {
+        .shape_type = SHAPE_TYPE_PLANE,
+        .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
+    };
+
+    line_t r = reflect_line_object(&l, &o);
+
+    assert(eqf(r.p.x, 0));
+    assert(eqf(r.p.y, 0));
+    assert(eqf(r.p.z, 0));
+
+    assert(eqf(r.b.x, 1));
+    assert(eqf(r.b.y, 1));
+    assert(eqf(r.b.z, 0));
+}
+
+color_t ray_trace(const world_t* w, const line_t* line, size_t N)
+{
+    ray_collision_t cs[N];
+
+    line_t l = *line; const object_t* o = NULL;
+    size_t n = 0; for(; n < N; n++) {
+        float t;
+        o = find_collision(&l, w, &t, o);
+        if(o == NULL) {
+            cs[n] = sky_collision(&l);
+            break;
+        } else {
+            cs[n] = (ray_collision_t){ .m = o->material };
+        }
+
+        // reorient the line to originate from the collision point
+        l.p = line_coord(l, t);
+        l.b = scalar_prod(-1, l.b);
+
+        l = reflect_line_object(&l, o);
+    }
+
+    if(n == N) {
+        return black;
+    }
+
+    color_t c = black;
+    for(ssize_t j = n; j >= 0; j--) {
+        c = color_mix(cs[j].m.color, c);
+        c = color_add(cs[j].m.light, c);
+    }
+    return c;
+}
 
 static viewport_t view;
 static world_t world;
@@ -225,6 +369,7 @@ void rt_setup(void)
 {
     solve_2nd_order_tests();
     intersect_line_sphere_points_tests();
+    reflect_line_object_tests();
 
     view.camera = vec(-10.0, 0, 5);
     view.plane.p = vec(0, 0, 5);
@@ -235,39 +380,18 @@ void rt_setup(void)
         {
             .shape_type = SHAPE_TYPE_SPHERE,
             .shape.sphere = { .c = vec(10, 0, 5), .r = 5 },
-            .material.color = green,
+            .material = { .light = black, .color = green },
         },
         {
             .shape_type = SHAPE_TYPE_PLANE,
             .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
-            .material.color = red,
+            .material = { .light = black, .color = red },
         },
     };
     world.objects = os;
     world.objects_len = LENGTH(os);
 
     stopwatch = stopwatch_mk("rt_draw", 1);
-}
-
-object_t* find_collision(const line_t* l, const world_t* w)
-{
-    float t_min = -1; size_t n = w->objects_len;
-    for(size_t i = 0; i < w->objects_len; i++) {
-        float s[2];
-        int r = intersect_line_object(l, &world.objects[i], s);
-
-        for(size_t j = 0; j < r; j++) {
-            if(s[0] < 0 || s[j] < s[0]) {
-                s[0] = s[j];
-            }
-        }
-
-        if(r > 0 && s[0] >= 0 && (t_min < 0 || s[0] < t_min)) {
-            t_min = s[0]; n = i;
-        }
-    }
-
-    return n < w->objects_len ? &w->objects[n] : NULL;
 }
 
 void rt_draw(color_t buf[], size_t height, size_t width)
@@ -283,11 +407,9 @@ void rt_draw(color_t buf[], size_t height, size_t width)
                   l.p.x, l.p.y, l.p.z,
                   l.b.x, l.b.y, l.b.z);
 
-            color_t c = black;
-            object_t* o = find_collision(&l, &world);
-            if(o) { c = o->material.color; }
-            buf[i*width + j] = c;
+            buf[i*width + j] = ray_trace(&world, &l, 20);
         }
     }
+
     stopwatch_stop(stopwatch);
 }

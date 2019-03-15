@@ -65,15 +65,22 @@ float norm_sq(vec_t v)
     return v.x*v.x + v.y*v.y + v.z*v.z;
 }
 
-inline __attribute__((always_inline))
+inline static __attribute__((always_inline))
+float norm(vec_t v)
+{
+    return sqrtf(norm_sq(v));
+}
+
+inline static __attribute__((always_inline))
 vec_t scalar_prod(float t, vec_t v)
 {
     return (vec_t){ .x = t * v.x, .y = t * v.y, .z = t * v.z};
 }
 
+inline static __attribute__((always_inline))
 vec_t normalize(vec_t v)
 {
-    return scalar_prod(1/sqrtf(norm_sq(v)), v);
+    return scalar_prod(1/norm(v), v);
 }
 
 inline static __attribute__((always_inline))
@@ -308,7 +315,7 @@ vec_t rotate(float angle, vec_t axis, vec_t v)
 
 float angle(vec_t a, vec_t b)
 {
-    not_implemented();
+    return acosf(dot(a, b)/(norm(a)*norm(b)));
 }
 
 // pre-conditions: l->p is in the surface of o->shape

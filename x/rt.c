@@ -209,6 +209,11 @@ typedef struct {
     material_t material;
 } object_t;
 
+typedef struct {
+    object_t* objects;
+    size_t objects_len;
+} world_t;
+
 int intersect_line_object(const line_t* l, const object_t* o, float t[])
 {
     switch(o->shape_type) {
@@ -221,54 +226,14 @@ int intersect_line_object(const line_t* l, const object_t* o, float t[])
     }
 }
 
-typedef struct {
-    vec_t camera;
-    grid_t plane;
-} viewport_t;
-
-typedef struct {
-    object_t* objects;
-    size_t objects_len;
-} world_t;
-
-static viewport_t view;
-static world_t world;
-static struct stopwatch* stopwatch;
-
-void rt_setup(void)
-{
-    solve_2nd_order_tests();
-    intersect_line_sphere_points_tests();
-
-    view.camera = vec(-10.0, 0, 5);
-    view.plane.p = vec(0, 0, 5);
-    view.plane.b[0] = vec(0, 0.01, 0);
-    view.plane.b[1] = vec(0, 0, -0.01);
-
-    static object_t os[] = {
-        {
-            .shape_type = SHAPE_TYPE_SPHERE,
-            .shape.sphere = { .c = vec(10, 0, 5), .r = 5 },
-            .material.color = green,
-        },
-        {
-            .shape_type = SHAPE_TYPE_PLANE,
-            .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
-            .material.color = red,
-        },
-    };
-    world.objects = os;
-    world.objects_len = LENGTH(os);
-
-    stopwatch = stopwatch_mk("rt_draw", 1);
-}
-
-const object_t* find_collision(const line_t* l, const world_t* w, float* t)
+const object_t* find_collision(const line_t* l, const world_t* w, float* t, const object_t* exclude)
 {
     float t_min = -1; size_t n = w->objects_len;
     for(size_t i = 0; i < w->objects_len; i++) {
+        if(&w->objects[i] == exclude) continue;
+
         float s[2];
-        int r = intersect_line_object(l, &world.objects[i], s);
+        int r = intersect_line_object(l, &w->objects[i], s);
 
         for(size_t j = 0; j < r; j++) {
             if(s[0] < 0 || s[j] < s[0]) s[0] = s[j];
@@ -290,29 +255,33 @@ const object_t* find_collision(const line_t* l, const world_t* w, float* t)
 }
 
 typedef struct {
+    vec_t camera;
+    grid_t plane;
+} viewport_t;
+
+
+typedef struct {
     material_t m;
 } ray_collision_t;
 
 static ray_collision_t sky_collision(const line_t* l)
 {
-    return (ray_collision_t) { .m.light = blue };
+    return (ray_collision_t) { .m = { .light = white, .color = black } };
 }
 
+inline static __attribute__((always_inline))
 color_t color_mix(color_t factor, color_t c)
 {
     return color(c.r*factor.r/0xff, c.g*factor.g/0xff, c.b*factor.b/0xff);
 }
 
+inline static __attribute__((always_inline))
 color_t color_add(color_t x, color_t y)
 {
-    return color(x.r+y.r, x.g+y.g, x.b+y.b);
+    return color(MIN(x.r+y.r, 0xff), MIN(x.g+y.g, 0xff), MIN(x.b+y.b, 0xff));
 }
 
-vec_t rotate(float angle, vec_t axis, vec_t v)
-{
-    not_implemented();
-}
-
+inline static __attribute__((always_inline))
 float angle(vec_t a, vec_t b)
 {
     return acosf(dot(a, b)/(norm(a)*norm(b)));
@@ -335,30 +304,49 @@ line_t reflect_line_object(const line_t* l, const object_t* o)
 
     return (line_t) {
         .p = l->p,
-        .b = rotate(2*angle(l->b, n), cross(l->b, n), l->b)
+        .b = sub(scalar_prod(2*dot(l->b, n)/norm_sq(n), n), l->b)
     };
+}
+
+void reflect_line_object_tests(void)
+{
+    line_t l = line_from_two_points(vec(0, 0, 0), vec(-1, -1, 0));
+    object_t o = {
+        .shape_type = SHAPE_TYPE_PLANE,
+        .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
+    };
+
+    line_t r = reflect_line_object(&l, &o);
+
+    assert(eqf(r.p.x, 0));
+    assert(eqf(r.p.y, 0));
+    assert(eqf(r.p.z, 0));
+
+    assert(eqf(r.b.x, 1));
+    assert(eqf(r.b.y, 1));
+    assert(eqf(r.b.z, 0));
 }
 
 color_t ray_trace(const world_t* w, const line_t* line, size_t N)
 {
     ray_collision_t cs[N];
 
-    line_t l = *line;
+    line_t l = *line; const object_t* o = NULL;
     size_t n = 0; for(; n < N; n++) {
         float t;
-        const object_t* o = find_collision(&l, w, &t);
-        if(!o) {
+        o = find_collision(&l, w, &t, o);
+        if(o == NULL) {
             cs[n] = sky_collision(&l);
             break;
+        } else {
+            cs[n] = (ray_collision_t){ .m = o->material };
         }
 
         // reorient the line to originate from the collision point
         l.p = line_coord(l, t);
+        l.b = scalar_prod(-1, l.b);
 
         l = reflect_line_object(&l, o);
-
-        // flip the line to make it point _towards_ the next potential collision
-        l.b = scalar_prod(-1, l.b);
     }
 
     if(n == N) {
@@ -367,10 +355,43 @@ color_t ray_trace(const world_t* w, const line_t* line, size_t N)
 
     color_t c = black;
     for(ssize_t j = n; j >= 0; j--) {
-        c = color_mix(cs[n].m.color, c);
-        c = color_add(cs[n].m.light, c);
+        c = color_mix(cs[j].m.color, c);
+        c = color_add(cs[j].m.light, c);
     }
     return c;
+}
+
+static viewport_t view;
+static world_t world;
+static struct stopwatch* stopwatch;
+
+void rt_setup(void)
+{
+    solve_2nd_order_tests();
+    intersect_line_sphere_points_tests();
+    reflect_line_object_tests();
+
+    view.camera = vec(-10.0, 0, 5);
+    view.plane.p = vec(0, 0, 5);
+    view.plane.b[0] = vec(0, 0.01, 0);
+    view.plane.b[1] = vec(0, 0, -0.01);
+
+    static object_t os[] = {
+        {
+            .shape_type = SHAPE_TYPE_SPHERE,
+            .shape.sphere = { .c = vec(10, 0, 5), .r = 5 },
+            .material = { .light = black, .color = green },
+        },
+        {
+            .shape_type = SHAPE_TYPE_PLANE,
+            .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
+            .material = { .light = black, .color = red },
+        },
+    };
+    world.objects = os;
+    world.objects_len = LENGTH(os);
+
+    stopwatch = stopwatch_mk("rt_draw", 1);
 }
 
 void rt_draw(color_t buf[], size_t height, size_t width)
@@ -386,10 +407,7 @@ void rt_draw(color_t buf[], size_t height, size_t width)
                   l.p.x, l.p.y, l.p.z,
                   l.b.x, l.b.y, l.b.z);
 
-            color_t c = black;
-            const object_t* o = find_collision(&l, &world, NULL);
-            if(o) { c = o->material.color; }
-            buf[i*width + j] = c;
+            buf[i*width + j] = ray_trace(&world, &l, 20);
         }
     }
 

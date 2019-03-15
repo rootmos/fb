@@ -9,9 +9,8 @@ typedef struct {
 
 #define color(rr,gg,bb) ((color_t){ .r = rr, .g = gg, .b = bb })
 
-#define black ((color_t){ 0 })
-#define white ((color_t){ 0xff })
-
+#define black color(0, 0, 0)
+#define white color(0xff, 0xff, 0xff)
 #define red color(0xff, 0x00, 0x00)
 #define green color(0x00, 0xff, 0x00)
 #define blue color(0x00, 0x00, 0xff)

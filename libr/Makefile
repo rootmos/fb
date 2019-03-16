@@ -5,7 +5,7 @@ EXTRA_CFLAGS ?= -O2
 EXTRA_LDFLAGS ?=
 PREFIX ?= /usr
 
-libr.a: util.o logging.o fail.o mark.o stopwatch.o
+libr.a: util.o logging.o fail.o mark.o stopwatch.o xorshift.o
 	ar -cr $@ $^
 
 install: libr.a

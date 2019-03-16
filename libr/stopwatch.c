@@ -28,7 +28,7 @@ void stopwatch_reset(struct stopwatch* const s)
 struct stopwatch* stopwatch_mk(const char* const what,
                                const size_t period)
 {
-    struct stopwatch* s = (struct stopwatch*)calloc(sizeof(*s), 1); assert(s);
+    struct stopwatch* s = calloc(sizeof(*s), 1); assert(s);
     s->what = what;
     s->period = period;
 

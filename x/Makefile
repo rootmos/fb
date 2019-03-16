@@ -11,7 +11,7 @@ EXTRA_CFLAGS += -pg
 EXTRA_LDFLAGS += -pg
 endif
 
-TIMEOUT ?= 5
+TIMEOUT ?= 1m
 
 CC = gcc
 LD = $(CC)

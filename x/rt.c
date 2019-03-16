@@ -273,7 +273,9 @@ typedef struct {
 
 static ray_collision_t sky_collision(const line_t* l)
 {
-    return (ray_collision_t) { .m = { .light = white, .color = black } };
+    return (ray_collision_t) {
+        .m = { .light = color(0x40, 0x10, 0x80), .color = black }
+    };
 }
 
 inline static __attribute__((always_inline))
@@ -315,7 +317,7 @@ line_t reflect_line_object(const line_t* l, const object_t* o)
     };
 }
 
-void reflect_line_object_tests(void)
+static void reflect_line_object_tests_plane(void)
 {
     line_t l = line_from_two_points(vec(0, 0, 0), vec(-1, -1, 0));
     object_t o = {
@@ -334,19 +336,56 @@ void reflect_line_object_tests(void)
     assert(eqf(r.b.z, 0));
 }
 
-vec_t disperse(vec_t v, float factor, uint64_t seed)
+static void reflect_line_object_tests_sphere(void)
 {
-    uint16_t Xi[3]; memcpy(Xi, &seed, MIN(sizeof(Xi), sizeof(seed)));
-    uint16_t Yi[3]; memcpy(Yi, &v, MIN(sizeof(Yi), sizeof(v)));
-    Xi[0] += Yi[0]; Xi[1] += Yi[1]; Xi[2] += Yi[2];
-    return vec(
-        v.x * (1 + factor * erand48(Xi)),
-        v.y * (1 + factor * erand48(Xi)),
-        v.z * (1 + factor * erand48(Xi))
-    );
+    line_t l = line_from_two_points(vec(0, 0, 0), vec(-1, -1, 0));
+    object_t o = {
+        .shape_type = SHAPE_TYPE_SPHERE,
+        .shape.sphere = { .c = vec(0, 0, -2), .r = 2 },
+    };
+
+    line_t r = reflect_line_object(&l, &o);
+
+    assert(eqf(r.p.x, 0));
+    assert(eqf(r.p.y, 0));
+    assert(eqf(r.p.z, 0));
+
+    assert(eqf(r.b.x, 1));
+    assert(eqf(r.b.y, 1));
+    assert(eqf(r.b.z, 0));
+
 }
 
-#define RAY_TRACE_DEPTH 10
+static void reflect_line_object_tests(void)
+{
+    reflect_line_object_tests_plane();
+    reflect_line_object_tests_sphere();
+}
+
+vec_t disperse(vec_t v, float factor, uint64_t seed)
+{
+    float h = norm(v);
+    vec_t a = vec(acosf(v.x/h), acosf(v.y/h), acosf(v.z/h));
+
+    uint64_t seeds[3];
+    seeds[0] = xorshift128plus_i();
+    seeds[1] = xorshift128plus_i();
+    seeds[2] = xorshift128plus_i();
+
+    vec_t b = scalar_prod(
+        M_PI*factor,
+        vec(
+            normal_dist(&seeds[0]),
+            normal_dist(&seeds[1]),
+            normal_dist(&seeds[2])
+        )
+    );
+    vec_t c = add(a, b);
+    return scalar_prod(h, vec(cosf(c.x), cosf(c.y), cosf(c.z)));
+}
+
+#define RAY_TRACE_DEPTH 20
+#define RAY_TRACE_N 60
 
 color_t ray_trace_one_line(const world_t* w, const line_t* line)
 {
@@ -368,14 +407,10 @@ color_t ray_trace_one_line(const world_t* w, const line_t* line)
         l.b = scalar_prod(-1, l.b);
 
         l = reflect_line_object(&l, o);
-        /*debug("pre disperse: %f %f %f", l.b.x, l.b.y, l.b.z);*/
         l.b = disperse(l.b, o->material.dispersion, o->unique.seed);
-        /*debug("post disperse: %f %f %f", l.b.x, l.b.y, l.b.z);*/
     }
 
-    if(n == RAY_TRACE_DEPTH) {
-        return black;
-    }
+    if(n == RAY_TRACE_DEPTH) { return black; }
 
     color_t c = black;
     for(ssize_t j = n; j >= 0; j--) {
@@ -385,14 +420,12 @@ color_t ray_trace_one_line(const world_t* w, const line_t* line)
     return c;
 }
 
-#define RAY_TRACE_N 5
-
 color_t ray_trace(const world_t* w, const line_t* line)
 {
     unsigned int c[3] = { 0 };
     for(size_t i = 0; i < RAY_TRACE_N; i++) {
         line_t l = *line;
-        l.b = disperse(l.b, 0.01, xorshift128plus_i());
+        l.b = disperse(l.b, 0.001, xorshift128plus_i());
         color_t d = ray_trace_one_line(w, &l);
         c[0] += d.r; c[1] += d.g; c[2] += d.b;
     }
@@ -411,34 +444,68 @@ void rt_setup(void)
 
     xorshift_state_initalize();
 
-    view.camera = vec(-10.0, 0, 5);
+    view.camera = vec(-10.0, -1, 7);
     view.plane.p = vec(0, 0, 5);
     view.plane.b[0] = vec(0, 0.01, 0);
     view.plane.b[1] = vec(0, 0, -0.01);
 
-    world.objects_len = 3;
+    world.objects_len = 5;
     object_t* os = world.objects = calloc(sizeof(object_t), world.objects_len);
     assert(os);
 
     os[0] = (object_t) {
         .unique.seed = xorshift128plus_i(),
         .shape_type = SHAPE_TYPE_SPHERE,
-        .shape.sphere = { .c = vec(10, 0, 5), .r = 5 },
-        .material = { .light = black, .color = green, .dispersion = 0.1 },
+        .shape.sphere = { .c = vec(10, 0, 6), .r = 5 },
+        .material = {
+            .light = white,
+            .color = black,
+            .dispersion = 0.3
+        },
     };
 
     os[1] = (object_t) {
         .unique.seed = xorshift128plus_i(),
         .shape_type = SHAPE_TYPE_PLANE,
         .shape.plane = { .p = vec(0, 0, 0), .n = vec(0, 0, 1) },
-        .material = { .light = black, .color = red, .dispersion = 0.2 },
+        .material = {
+            .light = black,
+            .color = color(0x90, 0x70, 0x70),
+            .dispersion = 2
+        },
     };
 
     os[2] = (object_t) {
         .unique.seed = xorshift128plus_i(),
         .shape_type = SHAPE_TYPE_SPHERE,
-        .shape.sphere = { .c = vec(7, 5, 2), .r = 2 },
-        .material = { .light = black, .color = blue, .dispersion = 0.5 },
+        .shape.sphere = { .c = vec(9, 7, 2), .r = 2 },
+        .material = {
+            .light = black,
+            .color = blue,
+            .dispersion = 0.01
+        },
+    };
+
+    os[3] = (object_t) {
+        .unique.seed = xorshift128plus_i(),
+        .shape_type = SHAPE_TYPE_SPHERE,
+        .shape.sphere = { .c = vec(8, -7, 3), .r = 2 },
+        .material = {
+            .light = black,
+            .color = green,
+            .dispersion = 0.2
+        },
+    };
+
+    os[4] = (object_t) {
+        .unique.seed = xorshift128plus_i(),
+        .shape_type = SHAPE_TYPE_SPHERE,
+        .shape.sphere = { .c = vec(20, -10, 30), .r = 8 },
+        .material = {
+            .light = white,
+            .color = black,
+            .dispersion = 0
+        },
     };
 
     stopwatch = stopwatch_mk("rt_draw", 1);

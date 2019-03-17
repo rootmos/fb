@@ -19,8 +19,8 @@ LD = $(CC)
 LIBS = -lxcb -lxcb-keysyms -l:libr.a -lm
 SRC = $(shell git ls-files)
 
-run: main
-	timeout --preserve-status $(TIMEOUT) ./$<
+run: rt
+	timeout --preserve-status $(TIMEOUT) ./$< > out.ppm && feh out.ppm
 
 gdb: main
 	gdb $<
@@ -28,6 +28,9 @@ gdb: main
 profile:
 	$(MAKE) clean run PROFILE=1
 	gprof main gmon.out | head -n10
+
+rt: rt.o
+	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)
 
 main: main.o rt.o
 	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ $(LIBS)

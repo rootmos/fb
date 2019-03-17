@@ -3,9 +3,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef BGRA
 typedef struct {
     uint8_t b, g, r, _;
 } color_t;
+#else
+typedef struct {
+    uint8_t r, g, b;
+} color_t;
+#endif
 
 #define color(rr,gg,bb) ((color_t){ .r = rr, .g = gg, .b = bb })
 

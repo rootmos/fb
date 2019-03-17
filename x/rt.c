@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <unistd.h>
 
 typedef struct {
     float x, y, z;
@@ -364,28 +366,33 @@ static void reflect_line_object_tests(void)
 
 vec_t disperse(vec_t v, float factor, uint64_t seed)
 {
-    float h = norm(v);
-    vec_t a = vec(acosf(v.x/h), acosf(v.y/h), acosf(v.z/h));
-
     uint64_t seeds[3];
-    seeds[0] = xorshift128plus_i();
-    seeds[1] = xorshift128plus_i();
-    seeds[2] = xorshift128plus_i();
+    memcpy(&seeds[0], &v.x, MIN(sizeof(uint64_t), sizeof(float)));
+    memcpy(&seeds[1], &v.y, MIN(sizeof(uint64_t), sizeof(float)));
+    memcpy(&seeds[2], &v.z, MIN(sizeof(uint64_t), sizeof(float)));
+    seed += seeds[0] * seeds[1] * seeds[2];
 
-    vec_t b = scalar_prod(
+    vec_t d = scalar_prod(
         M_PI*factor,
         vec(
-            normal_dist(&seeds[0]),
-            normal_dist(&seeds[1]),
-            normal_dist(&seeds[2])
+            normal_dist(&seed),
+            normal_dist(&seed),
+            normal_dist(&seed)
         )
     );
-    vec_t c = add(a, b);
-    return scalar_prod(h, vec(cosf(c.x), cosf(c.y), cosf(c.z)));
+
+    float h2 = norm_sq(v);
+
+    return vec(
+        v.x*cosf(d.x) - sqrt(h2 - v.x*v.x)*sinf(d.x),
+        v.y*cosf(d.y) - sqrt(h2 - v.y*v.y)*sinf(d.y),
+        v.z*cosf(d.z) - sqrt(h2 - v.z*v.z)*sinf(d.z)
+    );
 }
 
+
 #define RAY_TRACE_DEPTH 20
-#define RAY_TRACE_N 60
+#define RAY_TRACE_N 10
 
 color_t ray_trace_one_line(const world_t* w, const line_t* line)
 {
@@ -511,7 +518,7 @@ void rt_setup(void)
     stopwatch = stopwatch_mk("rt_draw", 1);
 }
 
-void rt_draw(color_t buf[], size_t height, size_t width)
+void rt_draw(color_t buf[], size_t width, size_t height)
 {
     stopwatch_start(stopwatch);
 
@@ -529,4 +536,30 @@ void rt_draw(color_t buf[], size_t height, size_t width)
     }
 
     stopwatch_stop(stopwatch);
+}
+
+
+void rt_write_ppm(int fd, const color_t buf[], size_t width, size_t height)
+{
+    int r = dprintf(fd, "P6\n%zu %zu\n255\n", width, height);
+    CHECK_IF(r < 0, "dprintf");
+
+    size_t i = 0; const size_t N = sizeof(color_t) * height * width;
+    while(i < N) {
+        r = write(fd, buf + i, N - i);
+        CHECK_IF(r < 0, "write");
+        i += r;
+    }
+
+    r = close(fd); CHECK(r, "close");
+}
+
+int main(int argc, char** argv)
+{
+    rt_setup();
+    const size_t w = 800, h = 600;
+    color_t buf[w * h];
+    rt_draw(buf, w, h);
+    rt_write_ppm(1, buf, w, h);
+    return 0;
 }

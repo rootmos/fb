@@ -4,6 +4,10 @@ fb
 Progress
 --------
 
+### 2019-03-18
+OpenCL-port
+![2019-03-18](https://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/2019-03-18_153854_980526401.png)
+
 ### 2019-03-16
 Better dispersion algorithm (slower)
 ![2019-03-16](https://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/2019-03-16_122815_723354467.png)

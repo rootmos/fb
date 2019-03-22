@@ -190,14 +190,29 @@ color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
 
 __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
 {
-    const size_t y = get_global_id(0), h = get_global_size(0);
-    const size_t x = get_global_id(1), w = get_global_size(1);
+    const size_t y = get_global_id(0), H = get_global_size(0);
+    const size_t x = get_global_id(1), W = get_global_size(1);
     const size_t n = get_global_id(2), N = get_global_size(2);
 
-    vec_t p = grid_coord(world->view.plane, (float)x - w/2, (float)y - h/2);
+    const vec_t u = world->view.look_at - world->view.camera; /* stage forward */
+    const vec_t v = normalize(cross(world->view.up, u)); /* stage left */
+    const vec_t w = normalize( /* stage up */
+        world->view.allow_tilt_shift ? world->view.up : cross(u, v)
+    );
+
+    const float a = atan((float)H/W);
+    const float h = length(u) * tan(world->view.fov/2);
+
+    const vec_t b0 = h * cos(a) * v, b1 = h * sin(a) * w;
+    grid_t g = {
+        .p = world->view.look_at + b0 + b1,
+        .b = { -2*b0/W, -2*b1/H }
+    };
+
+    vec_t p = grid_coord(g, x, y);
     line_t l = line_from_two_points(world->view.camera, p);
     l = disperse(l, 0.0002, world->seed * (n + 1));
-    out[(y*w + x)*N + n] = ray_trace_one_line(world, &l);
+    out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);
 }
 
 __kernel void rt_sample(__constant color_t in[], ulong N, __global color_t out[])

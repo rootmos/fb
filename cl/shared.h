@@ -56,18 +56,25 @@ typedef struct {
 
 typedef struct {
     vec_t camera;
-    grid_t plane;
-} viewport_t;
-
+    vec_t look_at;
+    vec_t up;
+    float fov;
+    int allow_tilt_shift;
+} view_t;
 
 typedef struct {
     seed_t seed;
-    viewport_t view;
+    view_t view;
     size_t objects_len;
     object_t objects[];
 } world_t;
 
+static inline size_t world_size_with_objects(size_t objects)
+{
+    return sizeof(world_t) + sizeof(object_t)*objects;
+}
+
 static inline size_t world_size(const world_t* w)
 {
-    return sizeof(world_t) + sizeof(object_t)*w->objects_len;
+    return world_size_with_objects(w->objects_len);
 }

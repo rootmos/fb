@@ -40,15 +40,12 @@ profile:
 	$(MAKE) clean run PROFILE=1
 	gprof main gmon.out | head -n10
 
-OBJS=main.o rt.o
-AUX=rt.cl rt.h shared.h types.h types.cl rnd.cl
+SRC=main.c rt.c
+AUX=rt.cl rt.h shared.h types.h types.cl rnd.cl world.c
 main: $(OBJS) $(AUX)
-	$(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(OBJS) $(LIBS)
-
-%.o: %.c
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c $<
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) $(LIBS)
 
 clean:
-	rm -f *.o main out.ppm
+	rm -f main out.ppm
 
 .PHONY: run clean gdb profile

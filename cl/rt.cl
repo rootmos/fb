@@ -102,14 +102,14 @@ int find_collision(line_t* l, __constant world_t* w, float* t, int exclude)
     }
 }
 
-line_t disperse(entropy_t* e, line_t l, float factor, seed_t seed)
+line_t disperse(line_t l, float factor, seed_t seed)
 {
     seed = rnd_combine((seed_t[]){ seed, seed_from_vec(l.p), seed_from_vec(l.b) }, 3);
 
     vec_t d = factor * (float)M_PI * vec(
-        normal_dist(e, &seed),
-        normal_dist(e, &seed),
-        normal_dist(e, &seed)
+        normal_dist(&seed),
+        normal_dist(&seed),
+        normal_dist(&seed)
     );
 
     return (line_t){
@@ -150,8 +150,7 @@ line_t reflect_line_object(line_t* l, __constant object_t* o)
 
 #define RAY_TRACE_DEPTH 10
 
-color_t ray_trace_one_line(__constant world_t* w, entropy_t* e,
-                           const line_t* line)
+color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
 {
     ray_collision_t cs[RAY_TRACE_DEPTH];
 
@@ -173,7 +172,6 @@ color_t ray_trace_one_line(__constant world_t* w, entropy_t* e,
         l = reflect_line_object(&l, &w->objects[o]);
 
         l = disperse(
-            e,
             l,
             w->objects[o].material.dispersion,
             w->objects[o].unique.seed
@@ -190,25 +188,16 @@ color_t ray_trace_one_line(__constant world_t* w, entropy_t* e,
     return c;
 }
 
-__kernel void rt_ray_trace(
-    __constant world_t* world,
-    __constant ulong* uniform, ulong uniform_N,
-    __constant float* normal, ulong normal_N,
-    __global color_t out[])
+__kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
 {
     const size_t y = get_global_id(0), h = get_global_size(0);
     const size_t x = get_global_id(1), w = get_global_size(1);
     const size_t n = get_global_id(2), N = get_global_size(2);
 
-    entropy_t e = {
-        .uniform = uniform, .uniform_N = uniform_N,
-        .normal = normal, .normal_N = normal_N,
-    };
-
     vec_t p = grid_coord(world->view.plane, (float)x - w/2, (float)y - h/2);
     line_t l = line_from_two_points(world->view.camera, p);
-    l = disperse(&e, l, 0.0001, world->seed * (n + 1));
-    out[(y*w + x)*N + n] = ray_trace_one_line(world, &e, &l);
+    l = disperse(l, 0.0002, world->seed * (n + 1));
+    out[(y*w + x)*N + n] = ray_trace_one_line(world, &l);
 }
 
 __kernel void rt_sample(__constant color_t in[], ulong N, __global color_t out[])

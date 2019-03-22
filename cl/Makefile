@@ -2,8 +2,9 @@ CC = gcc
 LD = $(CC)
 LOG_LEVEL ?= 5
 
-CFLAGS = -Wall -Werror -DLOG_LEVEL=$(LOG_LEVEL)
-LDFLAGS =
+BUILD ?= ../build
+CFLAGS = -Wall -Werror -DLOG_LEVEL=$(LOG_LEVEL) -I$(BUILD)/include
+LDFLAGS = -L$(BUILD)/lib
 
 EXTRA_CFLAGS ?= -O1
 EXTRA_LDFLAGS ?=
@@ -48,6 +49,6 @@ main: $(OBJS) $(AUX)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c $<
 
 clean:
-	rm -f *.o main
+	rm -f *.o main out.ppm
 
 .PHONY: run clean gdb profile

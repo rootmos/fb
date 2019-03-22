@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <stdlib.h>
 
 static struct {
     cl_context ctx;
@@ -15,8 +14,6 @@ static struct {
     struct stopwatch* stopwatch_init;
     struct stopwatch* stopwatch_draw;
     struct stopwatch* stopwatch_write;
-
-    entropy_t* entropy;
 } rt_state;
 
 void rt_write_ppm(int fd, const color_t buf[], size_t width, size_t height)
@@ -72,25 +69,6 @@ void rt_build_callback(cl_program p, void* data)
     }
 }
 
-entropy_t* rt_entropy(size_t uniform, size_t normal)
-{
-    entropy_t* entropy = calloc(sizeof(entropy_t), 1);
-
-    entropy->uniform_N = uniform;
-    entropy->uniform = calloc(sizeof(uint64_t), uniform);
-    for(size_t i = 0; i < uniform; i++) {
-        entropy->uniform[i] = xorshift128plus_i();
-    }
-
-    entropy->normal_N = normal;
-    entropy->normal = calloc(sizeof(float), normal);
-    for(size_t i = 0; i < normal; i++) {
-        entropy->normal[i] = normal_dist_i();
-    }
-
-    return entropy;
-}
-
 void rt_initialize(void)
 {
     rt_state.stopwatch_init = stopwatch_mk("rt_initialize", 1);
@@ -100,7 +78,6 @@ void rt_initialize(void)
     stopwatch_start(rt_state.stopwatch_init);
 
     xorshift_state_initalize();
-    rt_state.entropy = rt_entropy(128, 128);
 
     const char* src[] = { R"(
 #include "types.cl"
@@ -175,22 +152,10 @@ void rt_draw(const world_t* w, size_t width, size_t height, size_t samples,
     cl_int r;
 
     // buffers
-    cl_mem world = clCreateBuffer(rt_state.ctx,
+    cl_mem in = clCreateBuffer(rt_state.ctx,
         CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR,
         world_size(w), (void*)w, &r);
-    CHECK_OCL(r, "world = clCreateBuffer");
-
-    cl_mem uniform = clCreateBuffer(rt_state.ctx,
-        CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR,
-        rt_state.entropy->uniform_N * sizeof(uint64_t),
-        rt_state.entropy->uniform, &r);
-    CHECK_OCL(r, "uniform = clCreateBuffer");
-
-    cl_mem normal = clCreateBuffer(rt_state.ctx,
-        CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR,
-        rt_state.entropy->normal_N * sizeof(float),
-        rt_state.entropy->normal, &r);
-    CHECK_OCL(r, "normal = clCreateBuffer");
+    CHECK_OCL(r, "in = clCreateBuffer");
 
     const size_t N = sizeof(color_t)*width*height;
 
@@ -209,22 +174,10 @@ void rt_draw(const world_t* w, size_t width, size_t height, size_t samples,
     cl_kernel rt = clCreateKernel(rt_state.p, "rt_ray_trace", &r);
     CHECK_OCL(r, "clCreateKernel");
 
-    r = clSetKernelArg(rt, 0, sizeof(world), &world);
+    r = clSetKernelArg(rt, 0, sizeof(in), &in);
     CHECK_OCL(r, "clSetKernelArg");
 
-    r = clSetKernelArg(rt, 1, sizeof(uniform), &uniform);
-    CHECK_OCL(r, "clSetKernelArg");
-
-    r = clSetKernelArg(rt, 2, sizeof(size_t), &rt_state.entropy->uniform_N);
-    CHECK_OCL(r, "clSetKernelArg");
-
-    r = clSetKernelArg(rt, 3, sizeof(normal), &normal);
-    CHECK_OCL(r, "clSetKernelArg");
-
-    r = clSetKernelArg(rt, 4, sizeof(size_t), &rt_state.entropy->normal_N);
-    CHECK_OCL(r, "clSetKernelArg");
-
-    r = clSetKernelArg(rt, 5, sizeof(data), &data);
+    r = clSetKernelArg(rt, 1, sizeof(data), &data);
     CHECK_OCL(r, "clSetKernelArg");
 
 

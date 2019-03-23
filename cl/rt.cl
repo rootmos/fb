@@ -117,10 +117,14 @@ typedef struct {
     material_t m;
 } ray_collision_t;
 
-inline ray_collision_t sky_collision(const line_t* l)
+inline ray_collision_t sky_collision(__constant sky_t* s, const line_t* l)
 {
+    float f = max(1 - acos(dot(fast_normalize(s->sun), l->b))/M_PI_F, s->min);
     return (ray_collision_t) {
-        .m = { .light = color(0x40, 0x10, 0x80), .color = black }
+        .m = {
+            .light = color(f*s->color.r, f*s->color.g, f*s->color.b),
+            .color = black
+        }
     };
 }
 
@@ -154,7 +158,7 @@ color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
         float t;
         o = find_collision(&l, w, &t, o);
         if(o < 0) {
-            cs[n] = sky_collision(&l);
+            cs[n] = sky_collision(&w->sky, &l);
             break;
         } else {
             cs[n] = (ray_collision_t){ .m = w->objects[o].material };

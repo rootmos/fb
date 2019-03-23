@@ -57,8 +57,15 @@ typedef struct {
 } view_t;
 
 typedef struct {
+    vec_t sun;
+    color_t color;
+    float min;
+} sky_t;
+
+typedef struct {
     seed_t seed;
     view_t view;
+    sky_t sky;
     size_t objects_len;
     object_t objects[];
 } world_t;

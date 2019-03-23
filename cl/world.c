@@ -8,10 +8,14 @@ const world_t* create_world(void)
 
     world->seed = xorshift128plus_i();
 
-    world->view.camera = vec(-10.0, 0, 10);
+    world->view.camera = vec(-10.0, 0, 4.5);
     world->view.up = vec(0, 0, 1);
     world->view.look_at = vec(0, 0, 5);
     world->view.fov = M_PI/2;
+
+    world->sky.sun = vec(1, 1, 1);
+    world->sky.min = 0.1;
+    world->sky.color = color(0x40, 0x10, 0x80);
 
     world->objects[0] = (object_t) {
         .unique.seed = xorshift128plus_i(),
@@ -60,7 +64,7 @@ const world_t* create_world(void)
     world->objects[4] = (object_t) {
         .unique.seed = xorshift128plus_i(),
         .shape_type = SHAPE_TYPE_SPHERE,
-        .shape.sphere = { .c = vec(70, 40, 30), .r = 8 },
+        .shape.sphere = { .c = vec(70, 40, 15), .r = 8 },
         .material = {
             .light = orange,
             .color = black,

@@ -42,7 +42,7 @@ profile:
 
 SRC=main.c rt.c
 AUX=rt.cl rt.h shared.h types.h types.cl rnd.cl world.c
-main: $(OBJS) $(AUX)
+main: $(SRC) $(AUX)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) $(LIBS)
 
 clean:

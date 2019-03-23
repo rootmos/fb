@@ -11,9 +11,9 @@ int main(int argc, char** argv)
 
 #ifndef DEBUG
 #ifndef QUICK
-    const size_t w = 1920, h = 1080, samples = 100;
+    const size_t w = 1920, h = 1080, samples = 1+15*15;
 #else
-    const size_t w = 1920, h = 1080, samples = 10;
+    const size_t w = 1920, h = 1080, samples = 1+4;
 #endif
 #else
     const size_t w = 1, h = 1, samples = 1;

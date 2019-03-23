@@ -188,6 +188,7 @@ color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
     return c;
 }
 
+/* pre-condigtion: exists k: Even, (N = get_global_size) == 1 + k^2 */
 __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
 {
     const size_t y = get_global_id(0), H = get_global_size(0);
@@ -210,8 +211,15 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     };
 
     vec_t p = grid_coord(g, x, y);
+
+    if(n != 0) {
+        const float k = sqrt((float)(N-1));
+        p -= (2/k)*(g.b[0] + g.b[1]);
+        int quo, rem = remquo(n, k, &quo);
+        p += (quo*g.b[0] + rem*g.b[1]) / k;
+    }
+
     line_t l = line_from_two_points(world->view.camera, p);
-    l = disperse(l, 0.0002, world->seed * (n + 1));
     out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);
 }
 

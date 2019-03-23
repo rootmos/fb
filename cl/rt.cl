@@ -207,8 +207,10 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     vec_t p = world->view.look_at + (x - W/2)*b0 + (y - H/2)*b1;
 
     const float k = sqrt((float)(N-1));
-    int quo, rem = remquo(n, k, &quo);
-    p += ((quo - 2)*b0 + (rem - 2)*b1) / k;
+    if(fast_length(k) > 1e-7) {
+        int quo, rem = remquo(n, k, &quo);
+        p += ((quo - 2)*b0 + (rem - 2)*b1) / k;
+    }
 
     line_t l = line_from_two_points(world->view.camera, p);
     out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);

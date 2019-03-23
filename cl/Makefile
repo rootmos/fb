@@ -1,12 +1,12 @@
 CC = gcc
 LD = $(CC)
-LOG_LEVEL ?= 5
+LOG_LEVEL ?= 2
 
 BUILD ?= ../build
 CFLAGS = -Wall -Werror -DLOG_LEVEL=$(LOG_LEVEL) -I$(BUILD)/include
 LDFLAGS = -L$(BUILD)/lib
 
-EXTRA_CFLAGS ?= -O1
+EXTRA_CFLAGS ?= -g -O1
 EXTRA_LDFLAGS ?=
 
 ifdef PROFILE
@@ -24,13 +24,13 @@ endif
 
 TIMEOUT ?= 20s
 
-LIBS = -l:libr.a -lm -lOpenCL
+LIBS = -l:libr.a -lm -lOpenCL -lavcodec -lavutil -lavformat
 
 run: main
 ifdef DEBUG
 	timeout --preserve-status $(TIMEOUT) ./$<
 else
-	timeout --preserve-status $(TIMEOUT) ./$< > out.ppm && feh out.ppm
+	timeout --preserve-status $(TIMEOUT) ./$< && mpv out.mkv
 endif
 
 gdb: main
@@ -41,11 +41,11 @@ profile:
 	gprof main gmon.out | head -n10
 
 SRC=main.c rt.c
-AUX=rt.cl rt.h shared.h types.h types.cl rnd.cl world.c
+AUX=rt.cl rt.h shared.h types.h types.cl rnd.cl world.c enc.c
 main: $(SRC) $(AUX)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) $(LIBS)
 
 clean:
-	rm -f main out.ppm
+	rm -f main out.*
 
 .PHONY: run clean gdb profile

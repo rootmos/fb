@@ -1,16 +1,18 @@
 #include <stdlib.h>
 #include <math.h>
 
-const world_t* create_world(void)
+world_t* create_world(float t, float duration, float fps)
 {
     world_t* world = calloc(1, world_size_with_objects(5));
     world->objects_len = 5;
 
     world->seed = xorshift128plus_i();
 
-    world->view.camera = vec(-10.0, 0, 4.5);
+    float angle = 2*2*M_PI/(duration*fps);
+    world->view.camera = vec(10 - 20*cos(angle*t), 20*sin(angle*t), 10);
+
     world->view.up = vec(0, 0, 1);
-    world->view.look_at = vec(0, 0, 5);
+    world->view.look_at = vec(10, 0, 5);
     world->view.fov = M_PI/2;
 
     world->sky.sun = vec(1, 1, 1);

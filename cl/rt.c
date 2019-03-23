@@ -16,23 +16,26 @@ static struct {
     struct stopwatch* stopwatch_write;
 } rt_state;
 
-void rt_write_ppm(int fd, const color_t buf[], size_t width, size_t height)
+void rt_write_raw(int fd, const color_t buf[], size_t width, size_t height)
 {
     stopwatch_start(rt_state.stopwatch_write);
-
-    int r = dprintf(fd, "P6\n%zu %zu\n255\n", width, height);
-    CHECK_IF(r < 0, "dprintf");
+    trace("writing buf to %d", fd);
 
     size_t i = 0; const size_t N = sizeof(color_t) * height * width;
     while(i < N) {
-        r = write(fd, buf + i, N - i);
+        int r = write(fd, buf + i, N - i);
         CHECK_IF(r < 0, "write");
         i += r;
+        trace("wrote %d bytes", r);
     }
 
-    r = close(fd); CHECK(r, "close");
-
     stopwatch_stop(rt_state.stopwatch_write);
+}
+
+void rt_write_ppm_header(int fd, size_t width, size_t height)
+{
+    int r = dprintf(fd, "P6\n%zu %zu\n255\n", width, height);
+    CHECK_IF(r < 0, "dprintf");
 }
 
 
@@ -72,8 +75,8 @@ void rt_build_callback(cl_program p, void* data)
 void rt_initialize(void)
 {
     rt_state.stopwatch_init = stopwatch_mk("rt_initialize", 1);
-    rt_state.stopwatch_draw = stopwatch_mk("rt_draw", 1);
-    rt_state.stopwatch_write = stopwatch_mk("rt_write", 1);
+    rt_state.stopwatch_draw = stopwatch_mk("rt_draw", 24);
+    rt_state.stopwatch_write = stopwatch_mk("rt_write", 24);
 
     stopwatch_start(rt_state.stopwatch_init);
 
@@ -210,6 +213,10 @@ void rt_draw(const world_t* w, size_t width, size_t height, size_t samples,
         rt_state.q, out, CL_TRUE, 0, N, buf,
         1, (cl_event[]){ e1 }, NULL);
     CHECK_OCL(r, "clEnqueueReadBuffer");
+
+    r = clReleaseMemObject(in); CHECK_OCL(r, "clReleaseMemObject");
+    r = clReleaseMemObject(data); CHECK_OCL(r, "clReleaseMemObject");
+    r = clReleaseMemObject(out); CHECK_OCL(r, "clReleaseMemObject");
 
     stopwatch_stop(rt_state.stopwatch_draw);
 }

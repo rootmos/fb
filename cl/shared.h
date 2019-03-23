@@ -29,12 +29,6 @@ typedef struct {
 // |v - c| = r
 typedef struct { vec_t c; float r; } sphere_t;
 
-// p + span(b_0, b_1)
-typedef struct {
-    vec_t p;
-    vec_t b[2];
-} grid_t;
-
 typedef enum {
     SHAPE_TYPE_SPHERE,
     SHAPE_TYPE_PLANE,

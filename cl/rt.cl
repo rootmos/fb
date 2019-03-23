@@ -5,11 +5,6 @@ vec_t line_coord(line_t l, float t)
     return mad(t, l.b, l.p);
 }
 
-vec_t grid_coord(grid_t g, float s, float t)
-{
-    return mad(s, g.b[0], mad(t, g.b[1], g.p));
-}
-
 line_t line_from_two_points(vec_t v, vec_t w)
 {
     return (line_t){ .p = v, .b = normalize(w - v) };
@@ -191,8 +186,8 @@ color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
 /* pre-condigtion: exists k: Even, (N = get_global_size) == 1 + k^2 */
 __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
 {
-    const size_t y = get_global_id(0), H = get_global_size(0);
-    const size_t x = get_global_id(1), W = get_global_size(1);
+    const long y = get_global_id(0), H = get_global_size(0);
+    const long x = get_global_id(1), W = get_global_size(1);
     const size_t n = get_global_id(2), N = get_global_size(2);
 
     const vec_t u = world->view.look_at - world->view.camera; /* stage forward */
@@ -204,20 +199,12 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     const float a = atan((float)H/W);
     const float h = length(u) * tan(world->view.fov/2);
 
-    const vec_t b0 = h * cos(a) * v, b1 = h * sin(a) * w;
-    grid_t g = {
-        .p = world->view.look_at + b0 + b1,
-        .b = { -2*b0/W, -2*b1/H }
-    };
+    vec_t b0 = -2 * h * cos(a) * v / W, b1 = -2 * h * sin(a) * w / H;
+    vec_t p = world->view.look_at + (x - W/2)*b0 + (y - H/2)*b1;
 
-    vec_t p = grid_coord(g, x, y);
-
-    if(n != 0) {
-        const float k = sqrt((float)(N-1));
-        p -= (2/k)*(g.b[0] + g.b[1]);
-        int quo, rem = remquo(n, k, &quo);
-        p += (quo*g.b[0] + rem*g.b[1]) / k;
-    }
+    const float k = sqrt((float)(N-1));
+    int quo, rem = remquo(n, k, &quo);
+    p += ((quo - 2)*b0 + (rem - 2)*b1) / k;
 
     line_t l = line_from_two_points(world->view.camera, p);
     out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);

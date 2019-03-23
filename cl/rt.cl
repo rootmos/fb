@@ -214,15 +214,28 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);
 }
 
-__kernel void rt_sample(__constant color_t in[], ulong N, __global color_t out[])
+__kernel void rt_sample(__constant color_t in[], const ulong N,
+                        __global color_t out[])
 {
-    const size_t y = get_global_id(0);
-    const size_t x = get_global_id(1), w = get_global_size(1);
-    uint3 c = 0;
-    __constant color_t* samples = &in[(y*w + x)*N];
-    for(size_t n = 0; n < N; n++) {
-        const color_t s = samples[n];
-        c.s0 += s.r; c.s1 += s.g; c.s2 += s.b;
+    const long Y = get_global_id(0), H = get_global_size(0);
+    const long X = get_global_id(1), W = get_global_size(1);
+
+    color_t p = in[(Y*W + X)*N];
+
+    uint3 c = 0; ulong M = 0; const long s = 1;
+    for(long i = -s; i <= s; i++) {
+        for(long j = -s; j <= s; j++) {
+            long x = X + i, y = Y + j;
+            if(x >= 0 && x < W && y >= 0 && y < H) {
+                const ulong k = 1 + 2*s - (abs(i) + abs(j));
+                for(size_t n = 0; n < N; n++) {
+                    const color_t s = in[(y*W + x)*N + n];
+                    M += k;
+                    c.s0 += k*s.r; c.s1 += k*s.g; c.s2 += k*s.b;
+                }
+            }
+        }
     }
-    out[y*w + x] = color(c.s0/N, c.s1/N, c.s2/N);
+
+    out[Y*W + X] = color(c.s0/M, c.s1/M, c.s2/M);
 }

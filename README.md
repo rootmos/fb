@@ -4,6 +4,10 @@ fb
 Progress
 --------
 
+## 2019-03-23
+Sun-like effect
+![2019-03-23](http://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/2019-03-23_123212_911863885.png)
+
 ### 2019-03-18
 OpenCL-port
 ![2019-03-18](https://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/2019-03-18_153854_980526401.png)

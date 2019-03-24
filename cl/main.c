@@ -21,7 +21,7 @@ int main(int argc, const char* argv[])
 #if defined(DEBUG)
     const size_t w = 1, h = 1, samples = 1, frames = 1;
 #elif defined(QUICK)
-    const size_t w = 1280, h = 720, samples = 1, frames = fps * duration;
+    const size_t w = 1280, h = 720, samples = 1+2*2, frames = fps * duration;
 #else
     const size_t w = 1920, h = 1080, samples = 1+8*8, frames = fps * duration;
 #endif

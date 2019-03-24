@@ -194,25 +194,25 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     const long x = get_global_id(1), W = get_global_size(1);
     const size_t n = get_global_id(2), N = get_global_size(2);
 
-    const vec_t u = world->view.look_at - world->view.camera; /* stage forward */
-    const vec_t v = normalize(cross(world->view.up, u)); /* stage left */
-    const vec_t w = normalize( /* stage up */
+    const vec_t u = /* stage forward */ world->view.look_at - world->view.camera;
+    const vec_t v = /* stage left */ normalize(cross(world->view.up, u));
+    const vec_t w = /* stage up */ normalize(
         world->view.allow_tilt_shift ? world->view.up : cross(u, v)
     );
 
-    const float a = atan((float)H/W);
-    const float h = length(u) * tan(world->view.fov/2);
-
-    vec_t b0 = -2 * h * cos(a) * v / W, b1 = -2 * h * sin(a) * w / H;
+    const float a = (float)H/W;
+    const float h = -2 * length(u) * tan(world->view.fov/2) / sqrt(1 + a*a);
+    const vec_t b0 = h *     v / W;
+    const vec_t b1 = h * a * w / H;
     vec_t p = world->view.look_at + (x - W/2)*b0 + (y - H/2)*b1;
 
-    const float k = sqrt((float)(N-1));
-    if(fast_length(k) > 1e-7) {
+    if(N > 1) {
+        const float k = sqrt((float)(N-1));
         int quo, rem = remquo(n, k, &quo);
         p += ((quo - 2)*b0 + (rem - 2)*b1) / k;
     }
 
-    line_t l = line_from_two_points(world->view.camera, p);
+    const line_t l = line_from_two_points(world->view.camera, p);
     out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);
 }
 
@@ -224,7 +224,7 @@ __kernel void rt_sample(__constant color_t in[], const ulong N,
 
     color_t p = in[(Y*W + X)*N];
 
-    uint3 c = 0; ulong M = 0; const long s = 1;
+    uint3 c = 0; ulong M = 0; const long s = 0;
     for(long i = -s; i <= s; i++) {
         for(long j = -s; j <= s; j++) {
             long x = X + i, y = Y + j;

@@ -1,11 +1,3 @@
-#include <CL/cl.h>
-#include <r.h>
-#include "rt.h"
-
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-
 static struct {
     cl_context ctx;
     cl_command_queue q;
@@ -39,12 +31,13 @@ void rt_write_ppm_header(int fd, size_t width, size_t height)
 }
 
 
-void rt_error_callback(const char* err, const void* pi, size_t pi_len, void* data)
+static void rt_error_callback(
+    const char* err, const void* pi, size_t pi_len, void* data)
 {
     error("%s", err);
 }
 
-void rt_build_callback(cl_program p, void* data)
+static void rt_build_callback(cl_program p, void* data)
 {
     cl_int r; cl_uint ds;
     r = clGetProgramInfo(p, CL_PROGRAM_NUM_DEVICES, sizeof(ds), &ds, NULL);
@@ -115,11 +108,7 @@ void rt_initialize(void)
 
     info("found %u device with default: %s", ds, def_name);
 
-    rt_state.ctx = clCreateContext(
-        NULL,
-        ds, ids,
-        rt_error_callback, NULL,
-        &r);
+    rt_state.ctx = clCreateContext(NULL, ds, ids, rt_error_callback, NULL, &r);
     CHECK_OCL(r, "clCreateContext");
 
     rt_state.q = clCreateCommandQueueWithProperties(
@@ -127,8 +116,7 @@ void rt_initialize(void)
     CHECK_OCL(r, "clCreateCommandQueueWithProperties");
 
     rt_state.p = clCreateProgramWithSource(
-        rt_state.ctx,
-        LENGTH(src), src, src_len, &r);
+        rt_state.ctx, LENGTH(src), src, src_len, &r);
     CHECK_OCL(r, "clCreateProgramWithSource");
 
 #ifndef DEBUG
@@ -141,6 +129,13 @@ void rt_initialize(void)
     CHECK_OCL(r, "clBuildProgram");
 
     stopwatch_stop(rt_state.stopwatch_init);
+}
+
+void rt_deinitialize(void)
+{
+    cl_int r = clReleaseProgram(rt_state.p); CHECK_OCL(r, "clReleaseProgram");
+    r = clReleaseCommandQueue(rt_state.q); CHECK_OCL(r, "clReleaseCommandQueue");
+    r = clReleaseContext(rt_state.ctx); CHECK_OCL(r, "clReleaseContext");
 }
 
 void rt_run(void)

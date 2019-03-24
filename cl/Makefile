@@ -41,8 +41,8 @@ profile:
 	$(MAKE) clean run PROFILE=1
 	gprof main gmon.out | head -n10
 
-SRC=main.c rt.c
-AUX=rt.cl rt.h shared.h types.h types.cl rnd.cl world.c enc.c
+SRC=main.c
+AUX=rt.cl rt.c shared.h types.h types.cl rnd.cl world.c enc.c
 main: $(SRC) $(AUX)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) $(LIBS)
 

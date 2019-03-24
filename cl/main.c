@@ -1,3 +1,4 @@
+#include <CL/cl.h>
 #include <r.h>
 
 #include <string.h>
@@ -5,9 +6,11 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "rt.h"
+#include "types.h"
+#include "shared.h"
 #include "world.c"
 #include "enc.c"
+#include "rt.c"
 
 int main(int argc, const char* argv[])
 {
@@ -38,6 +41,7 @@ int main(int argc, const char* argv[])
     }
 
     enc_finalize(1);
+    rt_deinitialize();
 
     return 0;
 }

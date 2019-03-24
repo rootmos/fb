@@ -213,5 +213,8 @@ void rt_draw(const world_t* w, size_t width, size_t height, size_t samples,
     r = clReleaseMemObject(data); CHECK_OCL(r, "clReleaseMemObject");
     r = clReleaseMemObject(out); CHECK_OCL(r, "clReleaseMemObject");
 
+    r = clReleaseKernel(sampler); CHECK_OCL(r, "clReleaseKernel");
+    r = clReleaseKernel(rt); CHECK_OCL(r, "clReleaseKernel");
+
     stopwatch_stop(rt_state.stopwatch_draw);
 }

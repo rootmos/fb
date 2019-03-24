@@ -2,3 +2,6 @@ main
 out.*
 *.mkv
 *.ppm
+
+entropy
+*.gen.*

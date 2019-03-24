@@ -54,7 +54,7 @@ static void rt_build_callback(cl_program p, void* data)
         CHECK_OCL(r, "clGetProgramBuildInfo");
 
         if(s == CL_BUILD_ERROR) {
-            char buf[16384];
+            char buf[1<<16];
 
             r = clGetProgramBuildInfo(
                 p, ids[i], CL_PROGRAM_BUILD_LOG, sizeof(buf), buf, NULL);
@@ -77,6 +77,8 @@ void rt_initialize(size_t fps)
 
     const char* src[] = { R"(
 #include "types.cl"
+)", R"(
+#include "entropy.gen.h"
 )", R"(
 #include "rnd.cl"
 )", R"(

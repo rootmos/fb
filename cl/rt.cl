@@ -97,20 +97,12 @@ int find_collision(line_t* l, __constant world_t* w, float* t, int exclude)
     }
 }
 
-line_t disperse(line_t l, float factor, seed_t seed)
+vec_t disperse(vec_t n, seed_t seed)
 {
-    seed = rnd_combine((seed_t[]){ seed, seed_from_vec(l.p), seed_from_vec(l.b) }, 3);
-
-    vec_t d = factor * (float)M_PI * vec(
-        normal_dist(&seed),
-        normal_dist(&seed),
-        normal_dist(&seed)
-    );
-
-    return (line_t){
-        .p = l.p,
-        .b = normalize(l.b*cos(d) - sqrt(1 - l.b*l.b)*sin(d))
-    };
+    vec_t d, e;
+    if(dot(n, d = unit_vectors(rnd(&seed))) < 0) d *= -1;
+    if(dot(n, e = unit_vectors(rnd(&seed))) < 0) e *= -1;
+    return normalize(mix(d, e, uniform_float(seed)));
 }
 
 typedef struct {
@@ -128,28 +120,26 @@ inline ray_collision_t sky_collision(__constant sky_t* s, const line_t* l)
     };
 }
 
+vec_t object_normal(vec_t p, __constant object_t* o)
+{
+    switch(o->shape_type) {
+    case SHAPE_TYPE_SPHERE:
+        return (p - o->shape.sphere.c)/o->shape.sphere.r;
+    case SHAPE_TYPE_PLANE:
+        return o->shape.plane.n;
+    }
+}
+
 // pre-conditions: l->p is in the surface of o->shape
 line_t reflect_line_object(line_t* l, __constant object_t* o)
 {
-    vec_t n;
-    switch(o->shape_type) {
-    case SHAPE_TYPE_SPHERE:
-        n = (l->p - o->shape.sphere.c)/o->shape.sphere.r;
-        break;
-    case SHAPE_TYPE_PLANE:
-        n = o->shape.plane.n;
-        break;
-    }
-
-    return (line_t) {
-        .p = l->p,
-        .b = fma(2*dot(l->b, n), n, -l->b)
-    };
+    const vec_t n = object_normal(l->p, o);
+    return (line_t) { .p = l->p, .b = fma(2*dot(l->b, n), n, -l->b) };
 }
 
 #define RAY_TRACE_DEPTH 10
 
-color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
+color_t ray_trace_one_line(__constant world_t* w, const line_t* line, seed_t s)
 {
     ray_collision_t cs[RAY_TRACE_DEPTH];
 
@@ -170,11 +160,9 @@ color_t ray_trace_one_line(__constant world_t* w, const line_t* line)
 
         l = reflect_line_object(&l, &w->objects[o]);
 
-        l = disperse(
-            l,
-            w->objects[o].material.dispersion,
-            w->objects[o].unique.seed
-        );
+        if((rnd(&s) & w->objects[o].material.disperse) != 0) {
+            l.b = disperse(object_normal(l.p, &w->objects[o]), s);
+        }
     }
 
     if(n == RAY_TRACE_DEPTH) { return black; }
@@ -193,6 +181,11 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     const long y = get_global_id(0), H = get_global_size(0);
     const long x = get_global_id(1), W = get_global_size(1);
     const size_t n = get_global_id(2), N = get_global_size(2);
+
+    seed_t s = world->seed;
+    s += 134775813*x;
+    s += 12345*y;
+    s += 25214903917*n;
 
     const vec_t u = /* stage forward */ world->view.look_at - world->view.camera;
     const vec_t v = /* stage left */ normalize(cross(world->view.up, u));
@@ -213,7 +206,7 @@ __kernel void rt_ray_trace(__constant world_t* world, __global color_t out[])
     }
 
     const line_t l = line_from_two_points(world->view.camera, p);
-    out[(y*W + x)*N + n] = ray_trace_one_line(world, &l);
+    out[(y*W + x)*N + n] = ray_trace_one_line(world, &l, s);
 }
 
 __kernel void rt_sample(__constant color_t in[], const ulong N,

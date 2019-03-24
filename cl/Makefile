@@ -33,8 +33,6 @@ VIEWER = mpv
 endif
 endif
 
-LIBS = -l:libr.a -lm -lOpenCL -lavcodec -lavutil -lavformat
-
 ppm mkv:
 	$(MAKE) run FORMAT=$@
 
@@ -56,12 +54,20 @@ profile:
 	gprof main gmon.out | head -n10
 
 SRC=main.c
-AUX=rt.cl rt.c shared.h types.h types.cl rnd.cl world.c enc.c
+AUX=rt.cl rt.c shared.h types.h types.cl rnd.cl world.c enc.c entropy.gen.h
 main: $(SRC) $(AUX)
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) $(LIBS)
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) \
+		-l:libr.a -lm -lOpenCL -lavcodec -lavutil -lavformat
+
+entropy.gen.h: entropy
+	./$< > $@
+
+entropy: entropy.c
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $^ \
+		-l:libr.a -lm
 
 clean:
-	rm -f main out.* *.mkv *.ppm
+	rm -f main out.* *.mkv *.ppm entropy *.gen.*
 
 .PHONY: ppm mkv
 .PHONY: run clean gdb profile

@@ -25,7 +25,7 @@ world_t* create_world(float t, float duration, float fps)
         .material = {
             .light = white,
             .color = black,
-            .dispersion = 0.3
+            .disperse = PROB_ALWAYS,
         },
     };
 
@@ -36,7 +36,7 @@ world_t* create_world(float t, float duration, float fps)
         .material = {
             .light = black,
             .color = color(0x90, 0x70, 0x70),
-            .dispersion = 0.03
+            .disperse = PROB_ALWAYS
         },
     };
 
@@ -47,7 +47,7 @@ world_t* create_world(float t, float duration, float fps)
         .material = {
             .light = black,
             .color = color(0x50, 0x50, 0xff),
-            .dispersion = 0.01
+            .disperse = PROB_NEVER
         },
     };
 
@@ -58,7 +58,7 @@ world_t* create_world(float t, float duration, float fps)
         .material = {
             .light = black,
             .color = green,
-            .dispersion = 0.4
+            .disperse = PROB_ALWAYS
         },
     };
 
@@ -69,7 +69,7 @@ world_t* create_world(float t, float duration, float fps)
         .material = {
             .light = orange,
             .color = black,
-            .dispersion = 0.001
+            .disperse = PROB_NEVER
         },
     };
 

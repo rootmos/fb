@@ -23,7 +23,7 @@ typedef struct {
 typedef struct {
     color_t color;
     color_t light;
-    float dispersion;
+    probability_t disperse;
 } material_t;
 
 // |v - c| = r

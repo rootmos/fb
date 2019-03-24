@@ -4,9 +4,12 @@ fb
 Progress
 --------
 
+## 2019-03-24
+Render a [video sequence](https://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/20190324T080338Z.mkv)
+
 ## 2019-03-23
 Sun-like effect
-![2019-03-23](http://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/2019-03-23_123212_911863885.png)
+![2019-03-23](https://rootmos-static.ams3.cdn.digitaloceanspaces.com/projects/fb/2019-03-23_123212_911863885.png)
 
 ### 2019-03-18
 OpenCL-port

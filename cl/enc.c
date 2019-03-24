@@ -21,7 +21,7 @@ static void dump_pkt()
          enc_state.pkt->stream_index);
 }
 
-color_t* enc_initialize(size_t width, size_t height, const char* fn)
+color_t* enc_initialize(size_t width, size_t height, size_t fps, const char* fn)
 {
     // codec
     const char* codec_name = "libx264rgb";
@@ -41,8 +41,8 @@ color_t* enc_initialize(size_t width, size_t height, const char* fn)
 
     enc_state.cc->width = width;
     enc_state.cc->height = height;
-    enc_state.cc->time_base = (AVRational){1, 24};
-    enc_state.cc->framerate = (AVRational){24, 1};
+    enc_state.cc->time_base = (AVRational){1, fps};
+    enc_state.cc->framerate = (AVRational){fps, 1};
     enc_state.cc->pix_fmt = AV_PIX_FMT_RGB24;
 
     r = av_opt_set(enc_state.cc->priv_data, "preset", "fast", 0);

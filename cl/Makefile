@@ -23,14 +23,15 @@ EXTRA_CFLAGS += -DQUICK
 endif
 
 TIMEOUT ?= 20s
+OUTPUT ?= $(shell date -u +%Y%m%dT%H%M%SZ).mkv
 
 LIBS = -l:libr.a -lm -lOpenCL -lavcodec -lavutil -lavformat
 
 run: main
 ifdef DEBUG
-	timeout --preserve-status $(TIMEOUT) ./$<
+	timeout --preserve-status $(TIMEOUT) ./$< $(OUTPUT)
 else
-	timeout --preserve-status $(TIMEOUT) ./$< && mpv out.mkv
+	timeout --preserve-status $(TIMEOUT) ./$< $(OUTPUT) && mpv $(OUTPUT)
 endif
 
 gdb: main

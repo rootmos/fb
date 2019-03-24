@@ -1,6 +1,6 @@
 CC = gcc
 LD = $(CC)
-LOG_LEVEL ?= 2
+LOG_LEVEL ?= 3
 
 BUILD ?= ../build
 CFLAGS = -Wall -Werror -DLOG_LEVEL=$(LOG_LEVEL) -I$(BUILD)/include
@@ -8,6 +8,9 @@ LDFLAGS = -L$(BUILD)/lib
 
 EXTRA_CFLAGS ?= -g -O1
 EXTRA_LDFLAGS ?=
+
+FORMAT ?= ppm
+OUTPUT ?= $(shell date -u +%Y%m%dT%H%M%SZ).$(FORMAT)
 
 ifdef PROFILE
 EXTRA_CFLAGS += -pg
@@ -22,16 +25,27 @@ ifdef QUICK
 EXTRA_CFLAGS += -DQUICK
 endif
 
-TIMEOUT ?= 20s
-OUTPUT ?= $(shell date -u +%Y%m%dT%H%M%SZ).mkv
+ifndef VIEWER
+ifeq ($(FORMAT), ppm)
+VIEWER = feh
+else ifeq ($(FORMAT), mkv)
+VIEWER = mpv
+endif
+endif
 
 LIBS = -l:libr.a -lm -lOpenCL -lavcodec -lavutil -lavformat
 
+ppm mkv:
+	$(MAKE) run FORMAT=$@
+
 run: main
-ifdef DEBUG
+ifdef TIMEOUT
 	timeout --preserve-status $(TIMEOUT) ./$< $(OUTPUT)
 else
-	timeout --preserve-status $(TIMEOUT) ./$< $(OUTPUT) && mpv $(OUTPUT)
+	./$< $(OUTPUT)
+endif
+ifndef DEBUG
+	$(VIEWER) $(OUTPUT)
 endif
 
 gdb: main
@@ -47,6 +61,7 @@ main: $(SRC) $(AUX)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@ $(SRC) $(LIBS)
 
 clean:
-	rm -f main out.*
+	rm -f main out.* *.mkv *.ppm
 
+.PHONY: ppm mkv
 .PHONY: run clean gdb profile

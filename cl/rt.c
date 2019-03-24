@@ -65,11 +65,11 @@ static void rt_build_callback(cl_program p, void* data)
     }
 }
 
-void rt_initialize(void)
+void rt_initialize(size_t fps)
 {
     rt_state.stopwatch_init = stopwatch_mk("rt_initialize", 1);
-    rt_state.stopwatch_draw = stopwatch_mk("rt_draw", 24);
-    rt_state.stopwatch_write = stopwatch_mk("rt_write", 24);
+    rt_state.stopwatch_draw = stopwatch_mk("rt_draw", fps);
+    rt_state.stopwatch_write = stopwatch_mk("rt_write", fps);
 
     stopwatch_start(rt_state.stopwatch_init);
 

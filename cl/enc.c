@@ -121,7 +121,7 @@ void enc(size_t i)
     send_frame(enc_state.frame);
 }
 
-void enc_finalize(int out)
+void enc_finalize(void)
 {
     send_frame(NULL);
 
